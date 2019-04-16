@@ -1,9 +1,10 @@
-#include <iostream>
-#include <sstream>
-#include <fstream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 #include "zlib.h"
 
-# define BITS 80
+# define BITS 800
 # define STEPS 800
 
 void  SetBit( int A[],  int k )
@@ -23,7 +24,7 @@ int TestBit( int A[],  int k )
 
 unsigned char * printBits( int a[] , int bits_to_read )
 {
-  unsigned char * buf = (unsigned char *)malloc(bits_to_read * sizeof(unsigned char));
+  unsigned char * buf = (unsigned char *)malloc(bits_to_read * sizeof(uint8_t));
   for (int i = 0 ; i < bits_to_read ; i++) {
     buf[i] = (a[i/32] & (1 << (i%32))) != 0 ? '1': '0';
   }
@@ -51,7 +52,7 @@ void update_step(int base[], int len, int rule)
   memcpy(base, A, len * sizeof(int));
 }
 
-int compress_memory(void *in_data, size_t in_data_size)
+int compress_memory_size(void *in_data, size_t in_data_size)
 {
   const size_t BUFSIZE = 128 * 1024;
   uint8_t temp_buffer[BUFSIZE];
@@ -59,7 +60,7 @@ int compress_memory(void *in_data, size_t in_data_size)
   z_stream strm;
   strm.zalloc = 0;
   strm.zfree = 0;
-  strm.next_in = reinterpret_cast<uint8_t *>(in_data);
+  strm.next_in = (uint8_t *)(in_data);
   strm.avail_in = in_data_size;
   strm.next_out = temp_buffer;
   strm.avail_out = BUFSIZE;
@@ -98,41 +99,49 @@ int compress_memory(void *in_data, size_t in_data_size)
 void init_automat(int a[], int size)
 {
   SetBit(a, BITS/2);
-//   time_t t;
-//   srand((unsigned) time(&t));
-//   for (int i = 0 ; i < size ; i++) {
-//     if (rand()%2 == 0) {
-//       SetBit(a, i);
-//     }
-//   }
+  // time_t t;
+  // srand((unsigned) time(&t));
+  // for (int i = 0 ; i < size ; i++) {
+    // if (rand()%2 == 0) {
+      // SetBit(a, i);
+    // }
+  // }
 }
 
 void write_to_file(int rule, int print_automaton)
 {
-  std::ofstream out_file;
-  std::ostringstream fname;
-  fname << "data/out" << rule << ".dat";
-  out_file.open(fname.str());
+  FILE *out_file;
+  char * fname;
+  asprintf(&fname, "data/out%i.dat", rule);
+  out_file = fopen(fname, "w+");
 
   int A[BITS/32 + 1]  =  { };
   init_automat(A, BITS);
   for ( int i = 0 ; i < STEPS ; i++ ) {
 
-    if (print_automaton == 1) { std::cout << printBits(A, BITS) << "\n"; }
+    if (i%50 == 0) {
+      FILE *steps_file;
+      char * steps_fname;
+      asprintf(&steps_fname, "steps/out%i_%i.dat", rule, i);
+      steps_file = fopen(steps_fname, "w+");
+      fputs((char *)printBits(A, BITS), steps_file);
+      fclose(steps_file);
+    }
+
+    if (print_automaton == 1) { printf("%s\n", printBits(A, BITS)); }
 
     update_step(A, BITS, rule);
     if (i%30 == 0) {
-      out_file << i << "    "
-               << compress_memory(printBits(A, BITS), BITS) << "\n";
+      fprintf(out_file, "%i    %i\n", i, compress_memory_size(printBits(A, BITS), BITS));
     }
   }
-  out_file.close();
+  fclose(out_file);
 }
 
 int main()
 {
-  for (int rule = 88 ; rule < 89 ; rule ++) {
-    write_to_file(rule, 1);
+  for (int rule = 0 ; rule < 256 ; rule ++) {
+    write_to_file(rule, 0);
   }
   return 0;
 }
