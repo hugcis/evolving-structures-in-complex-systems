@@ -4,8 +4,10 @@
 #include <time.h>
 #include "compress.h"
 
-# define BITS 80
-# define STEPS 80
+# define BITS 800
+# define STEPS 800
+
+enum InitMode{ONE, RANDOM, RAND_SMALL};
 
 void  SetBit( int A[],  int k )
 {
@@ -22,21 +24,23 @@ int TestBit( int A[],  int k )
   return ( (A[k/32] & (1 << (k%32) )) != 0 ) ;
 }
 
-unsigned char * print_bits_spaced( int a[] , int bits_to_read, int spaced )
+char * print_bits_spaced( int a[] , int bits_to_read, int spaced )
 {
   int n_bits = spaced == 1 ? 2*bits_to_read - 1: bits_to_read;
   int buf_index;
 
-  unsigned char * buf = (unsigned char *)malloc(n_bits * sizeof(uint8_t));
+  char * buf = (char *)malloc((n_bits + 1) * sizeof(char));
+
   for (int i = 0 ; i < bits_to_read ; i++) {
     buf_index = spaced == 1 ? 2*i : i;
     buf[buf_index] = (a[i/32] & (1 << (i%32))) != 0 ? '1': '0';
     if (spaced == 1 & buf_index + 1 < n_bits) { buf[buf_index + 1] = ' '; }
   }
+  buf[n_bits] = '\0';
   return buf;
 }
 
-unsigned char * printBits( int a[], int bits_to_read )
+char * printBits( int a[], int bits_to_read )
 {
   return print_bits_spaced(a, bits_to_read, 0);
 }
@@ -44,8 +48,10 @@ unsigned char * printBits( int a[], int bits_to_read )
 
 void update_step(int base[], int len, int rule)
 {
-  int * A = (int *)malloc(len * sizeof(int));
-  memcpy(A, base, len * sizeof(int));
+  int size = len/32 +1;
+  int * A = (int *)malloc(size * sizeof(int));
+
+  memcpy(A, base, size * sizeof(int));
 
   for (int r = 0 ; r < len ; r ++ ) {
     int c = 0;
@@ -59,25 +65,45 @@ void update_step(int base[], int len, int rule)
     }
   }
 
-  memcpy(base, A, len * sizeof(int));
+  memcpy(base, A, size * sizeof(int));
+  free(A);
 }
 
-void init_automat(int a[], int size)
+void init_automat(int a[], int size, enum InitMode mode)
 {
-  /* SetBit(a, BITS/2); */
-  time_t t;
-  srand((unsigned) time(&t));
-  /* for (int i = 0 ; i < size ; i++) { */
-    /* if (rand()%2 == 0) { */
-      /* SetBit(a, i); */
-    /* } */
-  /* } */
-  SetBit(a, 0);
-  for (int i = 1 ; i < size/5 ; i++) {
-    if (rand()%2 == 0) {
-      SetBit(a, i);
+  if (mode == ONE) {
+    SetBit(a, size/2);
+  } else if (mode == RANDOM) {
+    time_t t;
+    srand((unsigned) time(&t));
+    for (int i = 0 ; i < size ; i++) {
+      if (rand()%2 == 0) {
+        SetBit(a, i);
+      }
+    }
+  } else if (mode == RAND_SMALL) {
+    time_t t;
+    srand((unsigned) time(&t));
+    SetBit(a, 0);
+    for (int i = 1 ; i < size/5 ; i++) {
+      if (rand()%2 == 0) {
+        SetBit(a, i);
+      }
     }
   }
+}
+
+void write_step(int A[], int rule, int step)
+{
+  FILE *steps_file;
+  char * steps_fname;
+  asprintf(&steps_fname, "steps/out%i_%i.step", rule, step);
+  steps_file = fopen(steps_fname, "w+");
+
+  char * output_string = printBits(A, BITS);
+  fputs(output_string, steps_file);
+  free(output_string);
+  fclose(steps_file);
 }
 
 void write_to_file(int rule, int print_automaton, int write)
@@ -93,26 +119,25 @@ void write_to_file(int rule, int print_automaton, int write)
   out_steps_file = fopen(out_steps_fname, "w+");
 
   int A[BITS/32 + 1]  =  { };
-  init_automat(A, BITS);
+  init_automat(A, BITS, RAND_SMALL);
 
   for ( int i = 0 ; i < STEPS ; i++ ) {
 
-    if (i%50 == 0 & write == 1) {
-      FILE *steps_file;
-      char * steps_fname;
-      asprintf(&steps_fname, "steps/out%i_%i.step", rule, i);
-      steps_file = fopen(steps_fname, "w+");
-      fputs((char *)printBits(A, BITS), steps_file);
-      fclose(steps_file);
-    }
+    if (i%50 == 0 & write == 1) { write_step(A, rule, i); }
 
-    fprintf(out_steps_file, "%s\n", print_bits_spaced(A, BITS, 1));
+    char * spaced_output = print_bits_spaced(A, BITS, 1);
+    fprintf(out_steps_file, "%s\n", spaced_output);
+    free(spaced_output);
+
     if (print_automaton == 1) { printf("%s\n", printBits(A, BITS)); }
 
     update_step(A, BITS, rule);
+
     if (i%30 == 0) {
+      char * output_string = printBits(A, BITS);
       fprintf(out_file, "%i    %i\n", i,
-              compress_memory_size(printBits(A, BITS), BITS));
+              compress_memory_size(output_string, BITS));
+      free(output_string);
     }
   }
   fclose(out_file);
@@ -122,7 +147,9 @@ void write_to_file(int rule, int print_automaton, int write)
 int main()
 {
   for (int rule = 0 ; rule < 256 ; rule ++) {
-    write_to_file(rule, 0, 0);
+    printf("\rRule %i", rule);
+    write_to_file(rule, 0, 1);
   }
+  printf("\n");
   return 0;
 }
