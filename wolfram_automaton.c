@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "zlib.h"
+#include <time.h>
+#include "compress.h"
 
-# define BITS 800
-# define STEPS 800
+# define BITS 80
+# define STEPS 80
 
 void  SetBit( int A[],  int k )
 {
@@ -22,13 +22,23 @@ int TestBit( int A[],  int k )
   return ( (A[k/32] & (1 << (k%32) )) != 0 ) ;
 }
 
-unsigned char * printBits( int a[] , int bits_to_read )
+unsigned char * print_bits_spaced( int a[] , int bits_to_read, int spaced )
 {
-  unsigned char * buf = (unsigned char *)malloc(bits_to_read * sizeof(uint8_t));
+  int n_bits = spaced == 1 ? 2*bits_to_read - 1: bits_to_read;
+  int buf_index;
+
+  unsigned char * buf = (unsigned char *)malloc(n_bits * sizeof(uint8_t));
   for (int i = 0 ; i < bits_to_read ; i++) {
-    buf[i] = (a[i/32] & (1 << (i%32))) != 0 ? '1': '0';
+    buf_index = spaced == 1 ? 2*i : i;
+    buf[buf_index] = (a[i/32] & (1 << (i%32))) != 0 ? '1': '0';
+    if (spaced == 1 & buf_index + 1 < n_bits) { buf[buf_index + 1] = ' '; }
   }
   return buf;
+}
+
+unsigned char * printBits( int a[], int bits_to_read )
+{
+  return print_bits_spaced(a, bits_to_read, 0);
 }
 
 
@@ -52,96 +62,67 @@ void update_step(int base[], int len, int rule)
   memcpy(base, A, len * sizeof(int));
 }
 
-int compress_memory_size(void *in_data, size_t in_data_size)
-{
-  const size_t BUFSIZE = 128 * 1024;
-  uint8_t temp_buffer[BUFSIZE];
-
-  z_stream strm;
-  strm.zalloc = 0;
-  strm.zfree = 0;
-  strm.next_in = (uint8_t *)(in_data);
-  strm.avail_in = in_data_size;
-  strm.next_out = temp_buffer;
-  strm.avail_out = BUFSIZE;
-
-  deflateInit(&strm, Z_BEST_COMPRESSION);
-
-  while (strm.avail_in != 0)
-  {
-    int res = deflate(&strm, Z_NO_FLUSH);
-    assert(res == Z_OK);
-    if (strm.avail_out == 0)
-    {
-      strm.next_out = temp_buffer;
-      strm.avail_out = BUFSIZE;
-    }
-  }
-
-  int deflate_res = Z_OK;
-  while (deflate_res == Z_OK)
-  {
-    if (strm.avail_out == 0)
-    {
-      strm.next_out = temp_buffer;
-      strm.avail_out = BUFSIZE;
-    }
-    deflate_res = deflate(&strm, Z_FINISH);
-  }
-
-  assert(deflate_res == Z_STREAM_END);
-  int compressed_size = BUFSIZE - strm.avail_out;
-  deflateEnd(&strm);
-
-  return compressed_size;
-}
-
 void init_automat(int a[], int size)
 {
-  SetBit(a, BITS/2);
-  // time_t t;
-  // srand((unsigned) time(&t));
-  // for (int i = 0 ; i < size ; i++) {
-    // if (rand()%2 == 0) {
-      // SetBit(a, i);
-    // }
-  // }
+  /* SetBit(a, BITS/2); */
+  time_t t;
+  srand((unsigned) time(&t));
+  /* for (int i = 0 ; i < size ; i++) { */
+    /* if (rand()%2 == 0) { */
+      /* SetBit(a, i); */
+    /* } */
+  /* } */
+  SetBit(a, 0);
+  for (int i = 1 ; i < size/5 ; i++) {
+    if (rand()%2 == 0) {
+      SetBit(a, i);
+    }
+  }
 }
 
-void write_to_file(int rule, int print_automaton)
+void write_to_file(int rule, int print_automaton, int write)
 {
   FILE *out_file;
   char * fname;
   asprintf(&fname, "data/out%i.dat", rule);
   out_file = fopen(fname, "w+");
 
+  FILE *out_steps_file;
+  char * out_steps_fname;
+  asprintf(&out_steps_fname, "steps/out%i.steps", rule);
+  out_steps_file = fopen(out_steps_fname, "w+");
+
   int A[BITS/32 + 1]  =  { };
   init_automat(A, BITS);
+
   for ( int i = 0 ; i < STEPS ; i++ ) {
 
-    if (i%50 == 0) {
+    if (i%50 == 0 & write == 1) {
       FILE *steps_file;
       char * steps_fname;
-      asprintf(&steps_fname, "steps/out%i_%i.dat", rule, i);
+      asprintf(&steps_fname, "steps/out%i_%i.step", rule, i);
       steps_file = fopen(steps_fname, "w+");
       fputs((char *)printBits(A, BITS), steps_file);
       fclose(steps_file);
     }
 
+    fprintf(out_steps_file, "%s\n", print_bits_spaced(A, BITS, 1));
     if (print_automaton == 1) { printf("%s\n", printBits(A, BITS)); }
 
     update_step(A, BITS, rule);
     if (i%30 == 0) {
-      fprintf(out_file, "%i    %i\n", i, compress_memory_size(printBits(A, BITS), BITS));
+      fprintf(out_file, "%i    %i\n", i,
+              compress_memory_size(printBits(A, BITS), BITS));
     }
   }
   fclose(out_file);
+  fclose(out_steps_file);
 }
 
 int main()
 {
   for (int rule = 0 ; rule < 256 ; rule ++) {
-    write_to_file(rule, 0);
+    write_to_file(rule, 0, 0);
   }
   return 0;
 }
