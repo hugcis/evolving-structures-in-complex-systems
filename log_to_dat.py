@@ -13,6 +13,6 @@ if __name__ == "__main__":
                     all_tuple.append((left, right))
 
             all_tuple.sort(key=lambda x: int(x[0]))
-            out_file.write('\n'.join(map(lambda x: '    '.join(x), all_tuple)))
+            out_file.write('\n'.join(map('    '.join, all_tuple)))
             out_file.close()
             in_file.close()

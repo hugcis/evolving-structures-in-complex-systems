@@ -15,6 +15,7 @@ int compress_memory_size(void *in_data, size_t in_data_size)
   strm.avail_in = in_data_size;
   strm.next_out = temp_buffer;
   strm.avail_out = BUFSIZE;
+  strm.data_type = Z_TEXT;
 
   deflateInit(&strm, Z_BEST_COMPRESSION);
 
