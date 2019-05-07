@@ -33,11 +33,13 @@ unsigned long hash(char *str)
   return hash;
 }
 
-
-char* print_bits(uint8_t a[][N], size_t bits_dim1, size_t bits_dim2)
+/**
+ * Format the 2d automaton as a string in buf.
+ */
+void print_bits(uint8_t a[][N], size_t bits_dim1, size_t bits_dim2, char* buf)
 {
-  char* buf = (char*)malloc(((bits_dim1 + 1) * bits_dim2 + 1)
-      * sizeof(uint8_t));
+  /* char* buf = (char*)malloc(((bits_dim1 + 1) * bits_dim2 + 1) */
+      /* * sizeof(uint8_t)); */
   char out_string = '0';
 
   for (size_t i = 0; i < bits_dim1; i++) {
@@ -48,7 +50,7 @@ char* print_bits(uint8_t a[][N], size_t bits_dim1, size_t bits_dim2)
     buf[i * (bits_dim1 + 1) + bits_dim2] = '\n';
   }
   buf[(bits_dim1 + 1) * bits_dim2] = '\0';
-  return buf;
+  /* return buf; */
 }
 
 void init_automat(uint8_t a[][N], size_t size)
@@ -62,7 +64,6 @@ void init_automat(uint8_t a[][N], size_t size)
     }
   }
 }
-
 
 void update_step_general(uint8_t base[][N], size_t size,
                          uint8_t rule[GRULE_SIZE], uint8_t** A)
@@ -116,6 +117,27 @@ void update_step_totalistic(uint8_t base[][N], size_t size,
   }
 }
 
+int count_cells(uint8_t A[N][N], size_t size)
+{
+  assert(A && size);
+  int* counts = (int*)calloc(STATES, sizeof(int));
+  for (int i = 0; i < size; ++i) {
+    for (int j = 0; j < size; ++j) {
+      counts[A[i][j]] += 1;
+    }
+  }
+  int value = counts[0];
+  for (int i = 0; i < STATES; ++i) {
+    if (counts[i] > value) {
+      value = counts[i];
+    }
+  }
+  return value + 1;
+}
+
+/**
+ * Given a rule, create and simulate the corresponding automaton.
+ */
 void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
                   int save_steps, int joint_complexity,
                   int totalistic)
@@ -124,8 +146,11 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
   char* fname;
   int last_compressed_size;
   int compressed_size;
+  int last_cell_count;
+  int cell_count = 0;
   int size_sum;
   float ratio = 0;
+  float ratio2 = 0;
 
   ProcessF process_function = totalistic == 1 ?
     update_step_totalistic: update_step_general;
@@ -140,9 +165,8 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
     placeholder[i] = (uint8_t*)malloc(N * sizeof(uint8_t));
   }
 
-  char* last_step[(N + 1) * N + 1];
-  char* double_placeholder[2 * ((N + 1) * N + 1)];
-  char* out_string;
+  char double_placeholder[2 * ((N + 1) * N + 1)];
+  char out_string[(N+1) * N + 1];
   int flag = 0;
 
   for (int i = 0; i < STEPS; i++) {
@@ -150,11 +174,16 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
 
     if (i % GRAIN == 0) {
       last_compressed_size = compressed_size;
-      out_string = print_bits(A, N, N);
-      compressed_size = compress_memory_size(out_string, (N + 1) * N);
+      last_cell_count = cell_count;
 
+      print_bits(A, N, N, out_string);
+      compressed_size = compress_memory_size(out_string, (N + 1) * N);
+      cell_count = count_cells(A, N);
+
+      /* Check if state has evolved from last time */
       if (compressed_size == last_compressed_size && flag == 1) {
         printf("\n");
+        /* Cleanup before returning */
         for (int i = 0; i < N; i++) {
           free(placeholder[i]);
         }
@@ -168,21 +197,28 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
       if (joint_complexity == 1) {
         memcpy(&double_placeholder[(N + 1) * N + 1],
                out_string, (N + 1) * N + 1);
+
         int double_compressed_size =
           compress_memory_size(double_placeholder, 2 * ((N + 1) * N + 1));
 
-        memcpy(last_step, out_string, (N + 1) * N + 1);
         memcpy(double_placeholder, out_string, (N + 1) * N + 1);
+
         if (i > 0) {
           size_sum = last_compressed_size + compressed_size;
-          ratio = (size_sum - double_compressed_size)/(float)size_sum;
+          ratio2 = (size_sum - double_compressed_size)/(float)size_sum;
+          ratio = ( (last_compressed_size / (float)last_cell_count) +
+                    (compressed_size / (float)cell_count) ) /
+            (double_compressed_size / (float)(last_cell_count + cell_count));
         }
-        fprintf(out_file, "%i    %i    %f\n", i, compressed_size, ratio);
+        fprintf(out_file, "%i    %i    %f    %f    %i    %i    %i\n",
+                i, compressed_size, ratio, ratio2, cell_count, last_cell_count,
+                double_compressed_size);
       } else {
         fprintf(out_file, "%i    %i\n", i, compressed_size);
       }
 
       printf("%i  ", compressed_size);
+      fflush(stdout);
 
       if (save_steps == 1) {
         FILE* out_step_file;
@@ -194,7 +230,7 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
         fclose(out_step_file);
       }
 
-      free(out_string);
+      /* free(out_string); */
     }
   }
   printf("\n");
@@ -224,13 +260,21 @@ void generate_totalistic_rule(uint8_t rule_array[RULE_SIZE],
   }
 }
 
+/**
+ * Symmetrize the rule by setting all the states and their symmetries to having
+ * the same output.
+ */
 void symmetrize_rule(uint8_t rule_array[GRULE_SIZE])
 {
   uint32_t position_180;
   uint32_t position_90;
   uint32_t position_270;
   uint32_t position_vflip;
-  /* Keep track of already seen positions */
+  uint32_t position_hflip;
+  uint32_t position_dflip;
+  uint32_t position_aflip;
+
+  /* Keep track of already seen positions with book-keeping */
   uint8_t book_keep[GRULE_SIZE];
   for (int i = 0; i < GRULE_SIZE; ++i) {
     book_keep[i] = 0;
@@ -239,15 +283,22 @@ void symmetrize_rule(uint8_t rule_array[GRULE_SIZE])
   int pos;
 
   for (int i = 0; i < GRULE_SIZE; ++i) {
-    /* Skip already seen positions */
-    /* if (book_keep[i] == 1) { */
-      /* continue; */
-    /* } */
+    /* Skip already seen positions when looping through the rule */
+    if (book_keep[i] == 1) {
+      continue;
+    }
 
     position_180 = 0;
     position_90 = 0;
     position_270 = 0;
     position_vflip = 0;
+    position_hflip = 0;
+    position_dflip = 0;
+    position_aflip = 0;
+
+    /* Create the representation of the symmetrized position by swapping the
+     * states in its number representation.
+     */
     for (int p = 0; p < NEIGH_SIZE + 1; ++p) {
       /* 180° rotation */
       position_180 += (uint32_t)pow(STATES, p) *
@@ -264,52 +315,95 @@ void symmetrize_rule(uint8_t rule_array[GRULE_SIZE])
 
       /* Vertical flip */
       pos = (SIDE * (p / SIDE)) + (SIDE - 1 - (p % 3));
-      if (i==99){
-        printf("%i", pos);
-        fflush(stdout);
-      }
       position_vflip += (uint32_t)pow(STATES, p) *
         ((i / (uint32_t)pow(STATES, pos)) % STATES);
 
       /* Horizontal flip */
+      if (p/SIDE < SIDE/2) {
+        pos = (p - SIDE + NEIGH_SIZE + 1)%(NEIGH_SIZE + 1);
+      } else if (p/SIDE > SIDE/2) {
+        pos = (p + SIDE)%(NEIGH_SIZE + 1);
+      } else {
+        pos = p;
+      }
+      position_hflip += (uint32_t)pow(STATES, p) *
+        ((i / (uint32_t)pow(STATES, pos)) % STATES);
+
+      /* Diagonal flip */
+      pos = NEIGH_SIZE - ((p % SIDE) * SIDE  + (p / SIDE));
+      position_dflip += (uint32_t)pow(STATES, p) *
+        ((i / (uint32_t)pow(STATES, pos)) % STATES);
+
+      /* Antidiagonal flip */
+      pos = ((p % SIDE) * SIDE  + (p / SIDE));
+      position_aflip += (uint32_t)pow(STATES, p) *
+        ((i / (uint32_t)pow(STATES, pos)) % STATES);
+
     }
+
+    /* Add all seen positions to the book to not process them again */
+    book_keep[i] = 1;
+    book_keep[position_180] = 1;
+    book_keep[position_90] = 1;
+    book_keep[position_270] = 1;
+    book_keep[position_vflip] = 1;
+    book_keep[position_hflip] = 1;
+    book_keep[position_dflip] = 1;
+    book_keep[position_aflip] = 1;
 
     rule_array[position_180] = rule_array[i];
     rule_array[position_90] = rule_array[i];
     rule_array[position_270] = rule_array[i];
     rule_array[position_vflip] = rule_array[i];
+    rule_array[position_hflip] = rule_array[i];
+    rule_array[position_dflip] = rule_array[i];
+    rule_array[position_aflip] = rule_array[i];
   }
 
 }
 
-void build_rule_from_args(uint8_t rule_array[RULE_SIZE],
-                          char rule_buf[RULE_SIZE + 1],
+/**
+ * Build a rule from the provided command-line arguments. Depending on the
+ * number of states, it either expect a base-( STATES - 1 ) input or a base-10
+ * input representing the rule.
+ */
+void build_rule_from_args(uint8_t rule_array[GRULE_SIZE],
+                          char rule_buf[GRULE_SIZE + 1],
                           char** argv)
 {
-  unsigned long rule_number = 0UL;
-  if (STATES == 2) {
-    char* eptr;
-    rule_number = strtoul(argv[1], &eptr, 10);
-    for (int s = 0 ; s < RULE_SIZE ; ++s) {
-      rule_array[s] = (uint8_t)((rule_number / (int)pow(STATES, s)) % STATES);
-    }
+  /* unsigned long rule_number = 0UL; */
+  /* if (STATES == 2) { */
+  /*   char* eptr; */
+  /*   rule_number = strtoul(argv[1], &eptr, 10); */
+  /*   for (int s = 0 ; s < RULE_SIZE ; ++s) { */
+  /*     rule_array[s] = (uint8_t)((rule_number / (int)pow(STATES, s)) % STATES); */
+  /*   } */
 
-    const int n = snprintf(NULL, 0, "%lu", rule_number);
-    assert(n > 0);
-    int c = snprintf(rule_buf, n+1, "%lu", rule_number);
-    assert(rule_buf[n] == '\0');
-    assert(c == n);
+  /*   const int n = snprintf(NULL, 0, "%lu", rule_number); */
+  /*   assert(n > 0); */
+  /*   int c = snprintf(rule_buf, n+1, "%lu", rule_number); */
+  /*   assert(rule_buf[n] == '\0'); */
+  /*   assert(c == n); */
 
-  } else {
-    for (int s = 0 ; s < RULE_SIZE ; ++s) {
+  /* } else { */
+  /*   for (int s = 0 ; s < RULE_SIZE ; ++s) { */
+  /*     rule_array[s] = argv[1][s] - '0'; */
+  /*     printf("%"PRIu8, rule_array[s]); */
+  /*     rule_buf[s] = argv[1][s]; */
+  /*   } */
+  /*   rule_buf[RULE_SIZE] = '\0'; */
+  /* } */
+
+    for (int s = 0 ; s < GRULE_SIZE ; ++s) {
       rule_array[s] = argv[1][s] - '0';
-      printf("%"PRIu8, rule_array[s]);
       rule_buf[s] = argv[1][s];
     }
-    rule_buf[RULE_SIZE] = '\0';
-  }
+    rule_buf[GRULE_SIZE] = '\0';
 }
 
+/**
+ * Generate a random general rule.
+ */
 void generate_general_rule(uint8_t rule_array[GRULE_SIZE],
                            char rule_buf[GRULE_SIZE + 1])
 {
@@ -331,8 +425,10 @@ int main(int argc, char** argv)
   /* Write steps for a given rule  */
   if (argc == 2) {
     build_rule_from_args(rule_array, rule_buf, argv);
+    sprintf(rule_buf, "%lu", hash(rule_buf));
+    printf("Rule %s\n", rule_buf);
 
-    process_rule(rule_array, rule_buf, 1, 1, 1);
+    process_rule(rule_array, rule_buf, 1, 1, 0);
     return 0;
   }
 
@@ -340,22 +436,35 @@ int main(int argc, char** argv)
   /* Generate compression plots for many rules */
   time_t t;
   srand((unsigned)time(&t));
+  FILE* dic_file;
+  char* fname;
 
-  fflush(stdout);
-  for (int i = 0; i < 1; ++i) {
+  for (int i = 0; i < 1000; ++i) {
     /* generate_totalistic_rule(rule_array, rule_buf); */
     for (int v = 0; v < GRULE_SIZE; v++) {
-      rule_array[v] = (uint8_t)(rand() % STATES);
-      sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
+      if (rand() % 10 < 3) {
+        rule_array[v] = 1;
+      } else {
+        rule_array[v] = 0;
+      }
+      /* rule_array[v] = (uint8_t)(rand() % STATES); */
     }
 
     symmetrize_rule(rule_array);
-    assert(rule_array[99] = rule_array[270]);
+    for (int v = 0; v < GRULE_SIZE; v++) {
+      sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
+    }
+
+    asprintf(&fname, "data_2d_%i/%lu.map", STATES, hash(rule_buf));
+    dic_file = fopen(fname, "w+");
+    fprintf(dic_file, "%s", rule_buf);
+    fclose(dic_file);
+
     sprintf(rule_buf, "%lu", hash(rule_buf));
     printf("%i: Rule %s\n", i, rule_buf);
     fflush(stdout);
 
-    /* process_rule(rule_array, rule_buf, 1, 1, 0); */
+    process_rule(rule_array, rule_buf, 0, 1, 0);
   }
   printf("\n");
   return 0;

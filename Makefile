@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-I. -Wall -lz -O2
+CFLAGS=-I. -Wall -lz -O2 -march=native -funroll-loops -ffast-math
 
 .PHONY: clean
 
