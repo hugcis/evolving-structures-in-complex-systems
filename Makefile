@@ -1,13 +1,29 @@
 CC=gcc
-CFLAGS=-I. -Wall -lz -O2 -march=native -funroll-loops -ffast-math
+LD=gcc
+CFLAGS=-I. -Wall -O2 -march=native -funroll-loops -ffast-math
+LDFLAGS=-I. -Wall -lz
+SOURCES:=$(wildcard src/*.c)
+OBJS:=$(SOURCES:src/%.c=build/%.o)
+TARGET:=bin/2d_automaton
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	@mkdir -p bin
+	$(LD) $(LDFLAGS) $+ -o $@
+
+build/%.o: src/%.c
+	@mkdir -p build
+	$(CC) $(CFLAGS) $+ -c -o $@
 
 .PHONY: clean
-
-2d_automaton: 2d_automaton.c compress.c
-	$(CC) $(CFLAGS) -o 2d_automaton 2d_automaton.c compress.c
-
-wolfram_automaton: wolfram_automaton.c compress.c
-	$(CC) $(CFLAGS) -o wolfram_automaton wolfram_automaton.c compress.c
-
 clean:
-	  $(RM) 2d_automaton wolfram_automaton
+	rm -rf $(OBJS)
+	rm -rf $(TARGET)
+	rmdir bin
+	rmdir build
+
+.PHONY: rebuild
+rebuild:
+	$(MAKE) clean
+	$(MAKE) all

@@ -5,18 +5,13 @@
 #include <string.h>
 #include <time.h>
 #include <inttypes.h>
+#include "2d_automaton.h"
 #include "compress.h"
 
-#define N 256
 #define STEPS 1000
 #define GRAIN 50
-#define STATES 2
-#define HORIZON (1)
-#define SIDE ( (2 * HORIZON) + 1 )
-#define NEIGH_SIZE ( (SIDE * SIDE) - 1 )
 #define NEIGHBOR ( (STATES - 1) * NEIGH_SIZE )
 #define RULE_SIZE ( (NEIGHBOR + 1) * STATES )
-#define GRULE_SIZE  ( (int)pow(STATES, NEIGH_SIZE + 1) )
 
 typedef void (*ProcessF)(uint8_t[][N] , size_t,
                          uint8_t[] , uint8_t**);
@@ -36,21 +31,43 @@ unsigned long hash(char *str)
 /**
  * Format the 2d automaton as a string in buf.
  */
-void print_bits(uint8_t a[][N], size_t bits_dim1, size_t bits_dim2, char* buf)
+void print_bits(uint8_t a[][N], size_t dim1, size_t dim2, char* buf)
 {
-  /* char* buf = (char*)malloc(((bits_dim1 + 1) * bits_dim2 + 1) */
-      /* * sizeof(uint8_t)); */
   char out_string = '0';
 
-  for (size_t i = 0; i < bits_dim1; i++) {
-    for (size_t j = 0; j < bits_dim2; j++) {
+  for (size_t i = 0; i < dim1; i++) {
+    for (size_t j = 0; j < dim2; j++) {
       out_string = '0' + a[i][j];
-      buf[i * (bits_dim1 + 1) + j] = out_string;
+      buf[i * (dim1 + 1) + j] = out_string;
     }
-    buf[i * (bits_dim1 + 1) + bits_dim2] = '\n';
+    buf[i * (dim1 + 1) + dim2] = '\n';
   }
-  buf[(bits_dim1 + 1) * bits_dim2] = '\0';
-  /* return buf; */
+  buf[(dim1 + 1) * dim2] = '\0';
+}
+
+void print_aggregated_bits(size_t dim1, size_t dim2, uint8_t a[][dim2],
+                           char* buf, int offset)
+{
+  int inc1 = 0;
+  int inc2, counter;
+  char out_string = '0';
+  for (size_t i = 0; i < dim1 - offset + 1; i+=offset) {
+    inc2 = 0;
+    for (size_t j = 0; j < dim2 - offset + 1; j+=offset) {
+      counter = 0;
+      for (int c1 = 0; c1 < offset; ++c1) {
+        for (int c2 = 0; c2 < offset; ++c2) {
+          counter += a[(i + c1) % dim1][(j + c2) % dim2];
+        }
+      }
+      out_string = '0' + counter;
+      buf[inc1 * (dim1/offset + 1) + inc2] = out_string;
+      inc2++;
+    }
+    buf[inc1 * (dim1/offset + 1) + inc2] = '\n';
+    inc1++;
+  }
+  buf[(inc1 - 1) * (dim1/offset + 1) + inc2 + 1] = '\0';
 }
 
 void init_automat(uint8_t a[][N], size_t size)
@@ -146,6 +163,7 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
   char* fname;
   int last_compressed_size;
   int compressed_size;
+  int agg_compressed_size;
   int last_cell_count;
   int cell_count = 0;
   int size_sum;
@@ -160,6 +178,7 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
 
   uint8_t A[N][N] = { {} };
   init_automat(A, N);
+
   uint8_t** placeholder = (uint8_t**)malloc(N * sizeof(uint8_t*));
   for (int i = 0; i < N; i++) {
     placeholder[i] = (uint8_t*)malloc(N * sizeof(uint8_t));
@@ -175,6 +194,9 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
     if (i % GRAIN == 0) {
       last_compressed_size = compressed_size;
       last_cell_count = cell_count;
+
+      print_aggregated_bits(N, N, A, out_string, 2);
+      agg_compressed_size = compress_memory_size(out_string, (N/2 + 1) * N);
 
       print_bits(A, N, N, out_string);
       compressed_size = compress_memory_size(out_string, (N + 1) * N);
@@ -210,9 +232,9 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
                     (compressed_size / (float)cell_count) ) /
             (double_compressed_size / (float)(last_cell_count + cell_count));
         }
-        fprintf(out_file, "%i    %i    %f    %f    %i    %i    %i\n",
+        fprintf(out_file, "%i    %i    %f    %f    %i    %i    %i    %i\n",
                 i, compressed_size, ratio, ratio2, cell_count, last_cell_count,
-                double_compressed_size);
+                double_compressed_size, agg_compressed_size);
       } else {
         fprintf(out_file, "%i    %i\n", i, compressed_size);
       }
@@ -229,8 +251,6 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
         fprintf(out_step_file, "%s", out_string);
         fclose(out_step_file);
       }
-
-      /* free(out_string); */
     }
   }
   printf("\n");
@@ -297,8 +317,7 @@ void symmetrize_rule(uint8_t rule_array[GRULE_SIZE])
     position_aflip = 0;
 
     /* Create the representation of the symmetrized position by swapping the
-     * states in its number representation.
-     */
+       states in its number representation. */
     for (int p = 0; p < NEIGH_SIZE + 1; ++p) {
       /* 180° rotation */
       position_180 += (uint32_t)pow(STATES, p) *
@@ -394,11 +413,12 @@ void build_rule_from_args(uint8_t rule_array[GRULE_SIZE],
   /*   rule_buf[RULE_SIZE] = '\0'; */
   /* } */
 
-    for (int s = 0 ; s < GRULE_SIZE ; ++s) {
-      rule_array[s] = argv[1][s] - '0';
-      rule_buf[s] = argv[1][s];
-    }
-    rule_buf[GRULE_SIZE] = '\0';
+  /* Rule is given in base-(STATES - 1) format */
+  for (int s = 0 ; s < GRULE_SIZE ; ++s) {
+    rule_array[s] = argv[1][s] - '0';
+    rule_buf[s] = argv[1][s];
+  }
+  rule_buf[GRULE_SIZE] = '\0';
 }
 
 /**
@@ -417,55 +437,3 @@ void generate_general_rule(uint8_t rule_array[GRULE_SIZE],
   sprintf(rule_buf, "%lu", hash(rule_buf));
 }
 
-int main(int argc, char** argv)
-{
-  char rule_buf[GRULE_SIZE + 1];
-  uint8_t rule_array[GRULE_SIZE];
-
-  /* Write steps for a given rule  */
-  if (argc == 2) {
-    build_rule_from_args(rule_array, rule_buf, argv);
-    sprintf(rule_buf, "%lu", hash(rule_buf));
-    printf("Rule %s\n", rule_buf);
-
-    process_rule(rule_array, rule_buf, 1, 1, 0);
-    return 0;
-  }
-
-
-  /* Generate compression plots for many rules */
-  time_t t;
-  srand((unsigned)time(&t));
-  FILE* dic_file;
-  char* fname;
-
-  for (int i = 0; i < 1000; ++i) {
-    /* generate_totalistic_rule(rule_array, rule_buf); */
-    for (int v = 0; v < GRULE_SIZE; v++) {
-      if (rand() % 10 < 3) {
-        rule_array[v] = 1;
-      } else {
-        rule_array[v] = 0;
-      }
-      /* rule_array[v] = (uint8_t)(rand() % STATES); */
-    }
-
-    symmetrize_rule(rule_array);
-    for (int v = 0; v < GRULE_SIZE; v++) {
-      sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
-    }
-
-    asprintf(&fname, "data_2d_%i/%lu.map", STATES, hash(rule_buf));
-    dic_file = fopen(fname, "w+");
-    fprintf(dic_file, "%s", rule_buf);
-    fclose(dic_file);
-
-    sprintf(rule_buf, "%lu", hash(rule_buf));
-    printf("%i: Rule %s\n", i, rule_buf);
-    fflush(stdout);
-
-    process_rule(rule_array, rule_buf, 0, 1, 0);
-  }
-  printf("\n");
-  return 0;
-}
