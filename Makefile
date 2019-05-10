@@ -4,7 +4,7 @@ CFLAGS=-I. -Wall -O2 -march=native -funroll-loops -ffast-math
 LDFLAGS=-I. -Wall -lz
 SOURCES:=$(wildcard src/*.c)
 OBJS:=$(SOURCES:src/%.c=build/%.o)
-TARGET:=bin/2d_automaton
+TARGET:=bin/automaton
 
 all: $(TARGET)
 

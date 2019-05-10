@@ -7,16 +7,9 @@
 #include "wolfram_automaton.h"
 #include "compress.h"
 
-
 #define GRAIN 50
 #define NEIGHBORS 3
 #define STATES 2
-
-enum InitMode {
-ONE,
-RANDOM,
-RAND_SMALL
-};
 
 
 char* print_bits_spaced(int bits_to_read, uint8_t a[bits_to_read])
@@ -113,11 +106,10 @@ void write_step(size_t size, size_t rule_size, uint8_t A[size],
   fclose(steps_file);
 }
 
-uint32_t write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
-                       int print_automaton, int write, long steps)
+void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
+                   int print_automaton, int write, struct Options1D* options)
 {
-  uint8_t new_rule[rule_size];
-  unsigned long previous_rule = 0;
+  size_t steps = options->timesteps;
 
   FILE* out_file;
   char* fname;
@@ -131,48 +123,32 @@ uint32_t write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
   out_steps_file = fopen(out_steps_fname, "w+");
 
   uint8_t A[size];
-  init_automat(size, A, RANDOM);
-  int v;
+  init_automat(size, A, options->init);
+  int v, comp_size = 0;
 
   for (v = 0; v < steps; ++v) {
-    for (int i = 0; i < rule_size; i++) {
 
-      /* if (i % GRAIN == 0 & write == 1) { */
-        /* write_step(A, rule, i); */
-      /* } */
+    char* spaced_output = print_bits_spaced(size, A);
+    fprintf(out_steps_file, "%s\n", spaced_output);
+    free(spaced_output);
 
-      char* spaced_output = print_bits_spaced(size, A);
-      fprintf(out_steps_file, "%s\n", spaced_output);
-      free(spaced_output);
-
-      if (print_automaton == 1) {
-        printf("%s\n", print_bits_spaced(size, A));
-      }
-
-      update_step(size, rule_size, A, rule);
-      new_rule[i] = A[size/2];
-
-      if (i % 30 == 0) {
-        char* output_string = print_bits_spaced(size, A);
-        fprintf(out_file, "%i    %i    %lu\n", i,
-                compress_memory_size(output_string, size),
-                rule_number(rule_size, rule));
-        free(output_string);
-      }
-    }
-    memcpy(rule, new_rule, rule_size * sizeof(uint8_t));
-    /* printf("%lu\n", rule_number(rule_size, rule)); */
-
-    if (rule_number(rule_size, rule) == previous_rule) {
-      fclose(out_file);
-      fclose(out_steps_file);
-      return v;
+    if (print_automaton == 1) {
+      printf("%s\n", print_bits_spaced(size, A));
     }
 
-    previous_rule = rule_number(rule_size, rule);
+    update_step(size, rule_size, A, rule);
+
+    if (v % GRAIN == 0) {
+      char* output_string = print_bits_spaced(size, A);
+      comp_size = compress_memory_size(output_string, size);
+
+      fprintf(out_file, "%i    %i    %lu\n", v, comp_size,
+              rule_number(rule_size, rule));
+      free(output_string);
+    }
+
   }
+  printf("%i", comp_size);
   fclose(out_file);
   fclose(out_steps_file);
-  return v;
 }
-

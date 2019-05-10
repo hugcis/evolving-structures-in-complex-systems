@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
@@ -64,40 +65,80 @@ int main_2d(int argc, char** argv)
 
 int main_1d(int argc, char** argv)
 {
-  uint32_t rule_size = (int)pow(STATES, 3);
+  extern char *optarg;
+  extern int optind;
+  int c, err = 0;
+  size_t size = 256, neighbor = 3;
+  int states = 2;
+  struct Options1D options;
+  options.init = ONE;
+  options.timesteps = 256;
+
+  char usage[] = "%s 1d [-s size]";
+  char invalid_init[] = "Invalid value \"%s\" for init option. Must be one of \
+\"one\", \"random\", \"random_small\"\n";
+
+  while ((c = getopt(argc - 1, &argv[1], "s:t:n:w:i:")) != -1)
+    switch (c) {
+    case 's':
+      size = atoi(optarg);
+      break;
+    case 't':
+      options.timesteps = atoi(optarg);
+      break;
+    case 'n':
+      states = atoi(optarg);
+      break;
+    case 'w':
+      neighbor = atoi(optarg);
+      break;
+    case 'i':
+      if (strcmp("one", optarg) == 0) {
+        options.init = ONE;
+      }
+      else if (strcmp("random", optarg) == 0) {
+        options.init = RANDOM;
+      }
+      else if (strcmp("random_small", optarg) == 0) {
+        options.init = RAND_SMALL;
+      }
+      else {
+        printf(invalid_init, optarg);
+        exit(1);
+      }
+      break;
+    case '?':
+      err = 1;
+      break;
+    }
+
+  if (err) {
+    fprintf(stderr, usage, argv[0]);
+    exit(1);
+  }
+
+  size_t rule_size = (int)pow(states, neighbor);
   uint8_t rule[rule_size];
-  uint32_t length[256] = {};
-  size_t runs = 10;
-  size_t size = 256;
 
   time_t t;
   srand((unsigned)time(&t));
 
-  for (int c = 0; c < runs; ++c) {
-    for (int n = 0; n < 256; n++) {
-      for (int i = 0; i < rule_size; ++i) {
-        rule[i] = (n & (1 << i)) ? 1: 0;
-        /* printf("%"PRIu8, rule[i]); */
-      }
-      /* printf("\n"); */
-      /* printf("%lu\n", rule_number(rule, RULE_SIZE)); */
-      length[n] += write_to_file(size, rule_size, rule, 0, 1, STEPS);
+  for (int n = 0; n < (int)pow(states, rule_size); n++) {
+    for (int i = 0; i < rule_size; ++i) {
+      rule[i] = (n & (1 << i)) ? 1: 0;
     }
+    printf("%lu\t", rule_number(rule_size, rule));
+    write_to_file(size, rule_size, rule, 0, 1, &options);
+    printf("\n");
   }
 
-  for (int n = 0; n < 256; n++) {
-    printf("%i\t%f\n", n, ((float)length[n])/runs);
-  }
-  /* for (int rule = 0; rule < RULE_SIZE; rule++) { */
-  /* printf("\rRule %i", rule); */
-  /* write_to_file(rule, 0, 1); */
-  /* } */
   return 0;
 }
 
 int main(int argc, char** argv)
 {
-  /* No arguments were passed */
+  char base_usage[] = "%s [\"1d\" or \"2d\"]";
+  /* No first argument was passed */
   if (argc < 2) {
     printf("%s\n", help);
     return 0;
@@ -108,5 +149,8 @@ int main(int argc, char** argv)
   }
   else if (strcmp("1d", argv[1]) == 0) {
     return main_1d(argc, argv);
+  }
+  else {
+    fprintf(stderr, base_usage, argv[0]);
   }
 }
