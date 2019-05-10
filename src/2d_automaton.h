@@ -15,12 +15,12 @@ unsigned long hash(char*);
 
 void build_rule_from_args(uint8_t rule_array[GRULE_SIZE],
                           char rule_buf[GRULE_SIZE + 1],
-                          char** argv);
+                          char*);
 
 void symmetrize_rule(uint8_t rule_array[GRULE_SIZE]);
 
 void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
-                  int, int, int);
+                  int, int, int, long);
 
 void update_step_general(uint8_t base[][N], size_t,
                          uint8_t rule[GRULE_SIZE], uint8_t**);

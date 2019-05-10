@@ -8,7 +8,6 @@
 #include "2d_automaton.h"
 #include "compress.h"
 
-#define STEPS 1000
 #define GRAIN 50
 #define NEIGHBOR ( (STATES - 1) * NEIGH_SIZE )
 #define RULE_SIZE ( (NEIGHBOR + 1) * STATES )
@@ -157,7 +156,7 @@ int count_cells(uint8_t A[N][N], size_t size)
  */
 void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
                   int save_steps, int joint_complexity,
-                  int totalistic)
+                  int totalistic, long steps)
 {
   FILE* out_file;
   char* fname;
@@ -188,7 +187,7 @@ void process_rule(uint8_t rule[GRULE_SIZE], char rule_buf[],
   char out_string[(N+1) * N + 1];
   int flag = 0;
 
-  for (int i = 0; i < STEPS; i++) {
+  for (int i = 0; i < steps; i++) {
     process_function(A, N, rule, placeholder);
 
     if (i % GRAIN == 0) {
@@ -388,7 +387,7 @@ void symmetrize_rule(uint8_t rule_array[GRULE_SIZE])
  */
 void build_rule_from_args(uint8_t rule_array[GRULE_SIZE],
                           char rule_buf[GRULE_SIZE + 1],
-                          char** argv)
+                          char* rule_arg)
 {
   /* unsigned long rule_number = 0UL; */
   /* if (STATES == 2) { */
@@ -415,8 +414,8 @@ void build_rule_from_args(uint8_t rule_array[GRULE_SIZE],
 
   /* Rule is given in base-(STATES - 1) format */
   for (int s = 0 ; s < GRULE_SIZE ; ++s) {
-    rule_array[s] = argv[1][s] - '0';
-    rule_buf[s] = argv[1][s];
+    rule_array[s] = rule_arg[s] - '0';
+    rule_buf[s] = rule_arg[s];
   }
   rule_buf[GRULE_SIZE] = '\0';
 }
