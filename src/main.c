@@ -73,12 +73,16 @@ int main_1d(int argc, char** argv)
   struct Options1D options;
   options.init = ONE;
   options.timesteps = 256;
+  options.write = NO_WRITE;
 
-  char usage[] = "%s 1d [-s size]";
-  char invalid_init[] = "Invalid value \"%s\" for init option. Must be one of \
-\"one\", \"random\", \"random_small\"\n";
+  char usage[] = "%s 1d [-s size] [-t timesteps]"
+                       "[-n n_states] [-w neighborhood width]"
+                       "[-i (one|random|random_small)] [-o]";
+  char invalid_init[] = "Invalid value \"%s\" for init option."
+                        " Must be one of \"one\", \"random\","
+                        " \"random_small\"\n";
 
-  while ((c = getopt(argc - 1, &argv[1], "s:t:n:w:i:")) != -1)
+  while ((c = getopt(argc - 1, &argv[1], "s:t:n:w:i:o")) != -1)
     switch (c) {
     case 's':
       size = atoi(optarg);
@@ -91,6 +95,9 @@ int main_1d(int argc, char** argv)
       break;
     case 'w':
       neighbor = atoi(optarg);
+      break;
+    case 'o':
+      options.write = WRITE_STEP;
       break;
     case 'i':
       if (strcmp("one", optarg) == 0) {
@@ -151,6 +158,7 @@ int main(int argc, char** argv)
     return main_1d(argc, argv);
   }
   else {
+    printf("%s\n", help);
     fprintf(stderr, base_usage, argv[0]);
   }
 }

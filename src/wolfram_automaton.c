@@ -145,6 +145,10 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
       fprintf(out_file, "%i    %i    %lu\n", v, comp_size,
               rule_number(rule_size, rule));
       free(output_string);
+
+      if (options->write == WRITE_STEP) {
+        write_step(size, rule_size, A, rule, v);
+      }
     }
 
   }
