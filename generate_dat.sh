@@ -1,7 +1,10 @@
 for rule in {1..255}
 do
     echo $rule;
-    ./paq8l archout steps/out$rule\_* > data/out$rule\_paq.log;
+    echo "" > data/out$rule\_pag.log
+    for stepname in $( ls steps/out$rule\_* ); do
+        ./paq8l archout $stepname >> data/out$rule\_paq.log;
+    done
 done
 
 rm archout.paq8l
