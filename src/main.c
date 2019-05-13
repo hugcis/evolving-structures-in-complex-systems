@@ -12,16 +12,17 @@ const char help[] = "Use with either 2d or 1d as first argument";
 
 int main_2d(int argc, char** argv)
 {
-  char rule_buf[GRULE_SIZE + 1];
-  uint8_t rule_array[GRULE_SIZE];
+  const uint64_t grule_size = (int) pow(STATES, NEIGH_SIZE + 1);
+  char rule_buf[grule_size + 1];
+  uint8_t rule_array[grule_size];
 
   /* Write steps for a given rule  */
   if (argc == 3) {
-    build_rule_from_args(rule_array, rule_buf, argv[2]);
+    build_rule_from_args(grule_size, rule_array, rule_buf, argv[2]);
     sprintf(rule_buf, "%lu", hash(rule_buf));
     printf("Rule %s\n", rule_buf);
 
-    process_rule(rule_array, rule_buf, 1, 1, 0, STEPS);
+    process_rule(grule_size, rule_array, rule_buf, 1, 1, 0, STEPS);
     return 0;
   }
 
@@ -34,19 +35,7 @@ int main_2d(int argc, char** argv)
 
   for (int i = 0; i < 1000; ++i) {
     /* generate_totalistic_rule(rule_array, rule_buf); */
-    for (int v = 0; v < GRULE_SIZE; v++) {
-      /* if (rand() % 10 < 3) { */
-        /* rule_array[v] = 1; */
-      /* } else { */
-        /* rule_array[v] = 0; */
-      /* } */
-      rule_array[v] = (uint8_t)(rand() % STATES);
-    }
-
-    symmetrize_rule(rule_array);
-    for (int v = 0; v < GRULE_SIZE; v++) {
-      sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
-    }
+    generate_general_rule(grule_size, rule_array, rule_buf);
 
     asprintf(&fname, "data_2d_%i/%lu.map", STATES, hash(rule_buf));
     dic_file = fopen(fname, "w+");
@@ -57,7 +46,7 @@ int main_2d(int argc, char** argv)
     printf("%i: Rule %s\n", i, rule_buf);
     fflush(stdout);
 
-    process_rule(rule_array, rule_buf, 0, 1, 0, STEPS);
+    process_rule(grule_size, rule_array, rule_buf, 0, 1, 0, STEPS);
   }
   printf("\n");
   return 0;
