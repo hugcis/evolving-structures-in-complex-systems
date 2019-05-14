@@ -12,17 +12,49 @@ const char help[] = "Use with either 2d or 1d as first argument";
 
 int main_2d(int argc, char** argv)
 {
-  const uint64_t grule_size = (int) pow(STATES, NEIGH_SIZE + 1);
+  extern char *optarg;
+  extern int optind;
+  int c, err = 0, input_flag = 0;
+  int states = 2;
+  int horizon = 1;
+  char* input_rule;
+
+  while ((c = getopt(argc - 1, &argv[1], "n:i:")) != -1)
+    switch (c) {
+    case 'n':
+      states = atoi(optarg);
+      break;
+    case 'i':
+      input_flag = 1;
+      input_rule = calloc(strlen(optarg), sizeof(char));
+      strcpy(input_rule, optarg);
+      break;
+    case '?':
+      err = 1;
+      break;
+    }
+
+  if (err) {
+    /* fprintf(stderr, usage, argv[0]); */
+    exit(1);
+  }
+
+  const int side = 2 * horizon + 1; /* Sidelength of neighborhood */
+  const int neigh_size = side * side - 1; /* Total number of neighbors */
+  /* Size of rule */
+  const uint64_t grule_size = (int) pow(states, neigh_size + 1);
+
   char rule_buf[grule_size + 1];
   uint8_t rule_array[grule_size];
 
   /* Write steps for a given rule  */
-  if (argc == 3) {
-    build_rule_from_args(grule_size, rule_array, rule_buf, argv[2]);
+  if (input_flag == 1) {
+    build_rule_from_args(grule_size, rule_array, rule_buf, input_rule, states);
     sprintf(rule_buf, "%lu", hash(rule_buf));
     printf("Rule %s\n", rule_buf);
 
-    process_rule(grule_size, rule_array, rule_buf, 1, 1, 0, STEPS);
+    process_rule(grule_size, rule_array, rule_buf,
+                 1, 1, 0, STEPS, states, horizon);
     return 0;
   }
 
@@ -35,9 +67,9 @@ int main_2d(int argc, char** argv)
 
   for (int i = 0; i < 1000; ++i) {
     /* generate_totalistic_rule(rule_array, rule_buf); */
-    generate_general_rule(grule_size, rule_array, rule_buf);
+    generate_general_rule(grule_size, rule_array, rule_buf, states, horizon);
 
-    asprintf(&fname, "data_2d_%i/%lu.map", STATES, hash(rule_buf));
+    asprintf(&fname, "data_2d_%i/%lu.map", states, hash(rule_buf));
     dic_file = fopen(fname, "w+");
     fprintf(dic_file, "%s", rule_buf);
     fclose(dic_file);
@@ -46,7 +78,8 @@ int main_2d(int argc, char** argv)
     printf("%i: Rule %s\n", i, rule_buf);
     fflush(stdout);
 
-    process_rule(grule_size, rule_array, rule_buf, 0, 1, 0, STEPS);
+    process_rule(grule_size, rule_array, rule_buf,
+                 0, 1, 0, STEPS, states, horizon);
   }
   printf("\n");
   return 0;

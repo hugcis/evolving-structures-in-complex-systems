@@ -9,11 +9,9 @@
 #include "compress.h"
 
 #define GRAIN 50
-#define NEIGHBOR ( (STATES - 1) * NEIGH_SIZE )
-#define RULE_SIZE ( (NEIGHBOR + 1) * STATES )
 
 typedef void (*ProcessF)(uint64_t, uint8_t[][N] , size_t,
-                         uint8_t[] , uint8_t**);
+                         uint8_t[] , uint8_t**, int, int);
 
 uint32_t ipow(int base, int exp)
 {
@@ -85,20 +83,21 @@ void print_aggregated_bits(size_t dim1, size_t dim2, uint8_t a[][dim2],
   buf[(inc1 - 1) * (dim1/offset + 1) + inc2 + 1] = '\0';
 }
 
-void init_automat(uint8_t a[][N], size_t size)
+void init_automat(uint8_t a[][N], size_t size, int states)
 {
   assert(size > 20);
   time_t t;
   srand((unsigned)time(&t));
   for (size_t i = size / 2 - 10; i < size / 2 + 10; i++) {
     for (size_t j = size / 2 - 10; j < size / 2 + 10; j++) {
-      a[i % size][j % size] = rand() % STATES;
+      a[i % size][j % size] = rand() % states;
     }
   }
 }
 
 void update_step_general(uint64_t grule_size, uint8_t base[][N], size_t size,
-                         uint8_t rule[grule_size], uint8_t** A)
+                         uint8_t rule[grule_size], uint8_t** A, int states,
+                         int horizon)
 {
   uint64_t position;
   int current_value;
@@ -110,10 +109,10 @@ void update_step_general(uint64_t grule_size, uint8_t base[][N], size_t size,
     for (size_t j = 0; j < size; j++) {
       position = 0;
       increment = 0;
-      for (int k = - HORIZON; k <= HORIZON; k++) {
-        for (int l = - HORIZON; l <= HORIZON; l++) {
+      for (int k = - horizon; k <= horizon; k++) {
+        for (int l = - horizon; l <= horizon; l++) {
           current_value = base[(i + k + size) % size][(j + l + size) % size];
-          position += current_value * ipow(STATES, increment);
+          position += current_value * ipow(states, increment);
           ++increment;
         }
       }
@@ -126,7 +125,8 @@ void update_step_general(uint64_t grule_size, uint8_t base[][N], size_t size,
 }
 
 void update_step_totalistic(uint64_t rule_size, uint8_t base[][N], size_t size,
-                            uint8_t rule[RULE_SIZE], uint8_t** A)
+                            uint8_t rule[rule_size], uint8_t** A, int states,
+                            int horizon)
 {
   int count;
   for (size_t i = 0; i < size; i++) {
@@ -134,14 +134,14 @@ void update_step_totalistic(uint64_t rule_size, uint8_t base[][N], size_t size,
 
     for (size_t j = 0; j < size; j++) {
       count = 0;
-      for (int k = - HORIZON; k <= HORIZON; k++) {
-        for (int l = - HORIZON; l <= HORIZON; l++) {
+      for (int k = - horizon; k <= horizon; k++) {
+        for (int l = - horizon; l <= horizon; l++) {
           if (k != 0 | l != 0) {
             count += base[(i + k + size) % size][(j + l + size) % size];
           }
         }
       }
-      A[i][j] = rule[STATES * count + base[i][j]];
+      A[i][j] = rule[states * count + base[i][j]];
     }
   }
   for (size_t i = 0; i < size; i++) {
@@ -149,17 +149,17 @@ void update_step_totalistic(uint64_t rule_size, uint8_t base[][N], size_t size,
   }
 }
 
-int count_cells(uint8_t A[N][N], size_t size)
+int count_cells(uint8_t A[N][N], size_t size, int states)
 {
   assert(A && size);
-  int* counts = (int*)calloc(STATES, sizeof(int));
+  int* counts = (int*)calloc(states, sizeof(int));
   for (int i = 0; i < size; ++i) {
     for (int j = 0; j < size; ++j) {
       counts[A[i][j]] += 1;
     }
   }
   int value = counts[0];
-  for (int i = 0; i < STATES; ++i) {
+  for (int i = 0; i < states; ++i) {
     if (counts[i] < value) {
       value = counts[i];
     }
@@ -172,7 +172,7 @@ int count_cells(uint8_t A[N][N], size_t size)
  */
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[], int save_steps, int joint_complexity,
-                  int totalistic, long steps)
+                  int totalistic, long steps, int states, int horizon)
 {
   FILE* out_file;
   char* fname;
@@ -188,11 +188,11 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   ProcessF process_function = totalistic == 1 ?
     update_step_totalistic: update_step_general;
 
-  asprintf(&fname, "data_2d_%i/out%s.dat", STATES, rule_buf);
+  asprintf(&fname, "data_2d_%i/out%s.dat", states, rule_buf);
   out_file = fopen(fname, "w+");
 
   uint8_t A[N][N] = { {} };
-  init_automat(A, N);
+  init_automat(A, N, states);
 
   uint8_t** placeholder = (uint8_t**)malloc(N * sizeof(uint8_t*));
   for (int i = 0; i < N; i++) {
@@ -204,7 +204,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   int flag = 0;
 
   for (int i = 0; i < steps; i++) {
-    process_function(grule_size, A, N, rule, placeholder);
+    process_function(grule_size, A, N, rule, placeholder, states, horizon);
 
     if (i % GRAIN == 0) {
       last_compressed_size = compressed_size;
@@ -215,7 +215,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
       print_bits(A, N, N, out_string);
       compressed_size = compress_memory_size(out_string, (N + 1) * N);
-      cell_count = count_cells(A, N);
+      cell_count = count_cells(A, N, states);
 
       /* Check if state has evolved from last time */
       if (compressed_size == last_compressed_size && flag == 1) {
@@ -261,7 +261,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
         FILE* out_step_file;
         char* step_fname;
         asprintf(&step_fname, "step_2d_%i/out%s_%i.step",
-                 STATES, rule_buf, i);
+                 states, rule_buf, i);
         out_step_file = fopen(step_fname, "w+");
         fprintf(out_step_file, "%s", out_string);
         fclose(out_step_file);
@@ -277,20 +277,20 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   fclose(out_file);
 }
 
-void generate_totalistic_rule(uint8_t rule_array[RULE_SIZE],
-                              char rule_buf[RULE_SIZE + 1])
+void generate_totalistic_rule(uint64_t rule_size, uint8_t rule_array[rule_size],
+                              char rule_buf[rule_size + 1], int states)
 {
   unsigned long rule_number = 0UL;
 
-  for (int s = 0 ; s < RULE_SIZE ; ++s) {
-    rule_array[s] = rand() % STATES;
-    rule_number += rule_array[s] * ipow(STATES, s);
-    if (STATES >= 3) {
+  for (int s = 0 ; s < rule_size; ++s) {
+    rule_array[s] = rand() % states;
+    rule_number += rule_array[s] * ipow(states, s);
+    if (states >= 3) {
       rule_buf[s] = '0' + rule_array[s];
     }
   }
 
-  if (STATES == 2) {
+  if (states == 2) {
     sprintf(rule_buf, "%lu", rule_number);
   }
 }
@@ -299,8 +299,13 @@ void generate_totalistic_rule(uint8_t rule_array[RULE_SIZE],
  * Symmetrize the rule by setting all the states and their symmetries to having
  * the same output.
  */
-void symmetrize_rule(uint64_t grule_size, uint8_t rule_array[grule_size])
+void symmetrize_rule(uint64_t grule_size,
+                     uint8_t rule_array[grule_size],
+                     int states, int horizon)
 {
+  int side = 2 * horizon + 1;
+  int neigh_size = side * side - 1;
+
   uint32_t position_180;
   uint32_t position_90;
   uint32_t position_270;
@@ -319,9 +324,9 @@ void symmetrize_rule(uint64_t grule_size, uint8_t rule_array[grule_size])
 
   for (int i = 0; i < grule_size; ++i) {
     /* Skip already seen positions when looping through the rule */
-    /* if (book_keep[i] == 1) { */
-      /* continue; */
-    /* } */
+    if (book_keep[i] == 1) {
+      continue;
+    }
 
     position_180 = 0;
     position_90 = 0;
@@ -333,45 +338,45 @@ void symmetrize_rule(uint64_t grule_size, uint8_t rule_array[grule_size])
 
     /* Create the representation of the symmetrized position by swapping the
        states in its number representation. */
-    for (int p = 0; p < NEIGH_SIZE + 1; ++p) {
+    for (int p = 0; p < neigh_size + 1; ++p) {
       /* 180° rotation */
-      position_180 += (uint32_t)ipow(STATES, p) *
-        ((i / (uint32_t)ipow(STATES, NEIGH_SIZE  - p)) % STATES);
+      position_180 += (uint32_t)ipow(states, p) *
+        ((i / (uint32_t)ipow(states, neigh_size  - p)) % states);
 
       /* 90° rotation */
-      pos = (NEIGH_SIZE - SIDE + 1 - (SIDE * (p%SIDE)) + p/SIDE);
-      position_90 += (uint32_t)ipow(STATES, p) *
-        ((i / (uint32_t)ipow(STATES, pos)) % STATES);
+      pos = (neigh_size - side + 1 - (side * (p%side)) + p/side);
+      position_90 += (uint32_t)ipow(states, p) *
+        ((i / (uint32_t)ipow(states, pos)) % states);
 
       /* 270° rotation */
-      position_270 += (uint32_t)ipow(STATES, p) *
-        ((i / (uint32_t)ipow(STATES, NEIGH_SIZE  - pos)) % STATES);
+      position_270 += (uint32_t)ipow(states, p) *
+        ((i / (uint32_t)ipow(states, neigh_size  - pos)) % states);
 
       /* Vertical flip */
-      pos = (SIDE * (p / SIDE)) + (SIDE - 1 - (p % 3));
-      position_vflip += (uint32_t)ipow(STATES, p) *
-        ((i / (uint32_t)ipow(STATES, pos)) % STATES);
+      pos = (side * (p / side)) + (side - 1 - (p % 3));
+      position_vflip += (uint32_t)ipow(states, p) *
+        ((i / (uint32_t)ipow(states, pos)) % states);
 
       /* Horizontal flip */
-      if (p/SIDE < SIDE/2) {
-        pos = (p - SIDE + NEIGH_SIZE + 1)%(NEIGH_SIZE + 1);
-      } else if (p/SIDE > SIDE/2) {
-        pos = (p + SIDE)%(NEIGH_SIZE + 1);
+      if (p/side < side/2) {
+        pos = (p - side + neigh_size + 1)%(neigh_size + 1);
+      } else if (p/side > side/2) {
+        pos = (p + side)%(neigh_size + 1);
       } else {
         pos = p;
       }
-      position_hflip += (uint32_t)ipow(STATES, p) *
-        ((i / (uint32_t)ipow(STATES, pos)) % STATES);
+      position_hflip += (uint32_t)ipow(states, p) *
+        ((i / (uint32_t)ipow(states, pos)) % states);
 
       /* Diagonal flip */
-      pos = NEIGH_SIZE - ((p % SIDE) * SIDE  + (p / SIDE));
-      position_dflip += (uint32_t)ipow(STATES, p) *
-        ((i / (uint32_t)ipow(STATES, pos)) % STATES);
+      pos = neigh_size - ((p % side) * side  + (p / side));
+      position_dflip += (uint32_t)ipow(states, p) *
+        ((i / (uint32_t)ipow(states, pos)) % states);
 
       /* Antidiagonal flip */
-      pos = ((p % SIDE) * SIDE  + (p / SIDE));
-      position_aflip += (uint32_t)ipow(STATES, p) *
-        ((i / (uint32_t)ipow(STATES, pos)) % STATES);
+      pos = ((p % side) * side  + (p / side));
+      position_aflip += (uint32_t)ipow(states, p) *
+        ((i / (uint32_t)ipow(states, pos)) % states);
 
     }
 
@@ -398,20 +403,20 @@ void symmetrize_rule(uint64_t grule_size, uint8_t rule_array[grule_size])
 
 /**
  * Build a rule from the provided command-line arguments. Depending on the
- * number of states, it either expect a base-( STATES - 1 ) input or a base-10
+ * number of states, it either expect a base-( states - 1 ) input or a base-10
  * input representing the rule.
  */
 void build_rule_from_args(uint64_t grule_size,
                           uint8_t rule_array[grule_size],
                           char rule_buf[grule_size + 1],
-                          char* rule_arg)
+                          char* rule_arg, int states)
 {
   /* unsigned long rule_number = 0UL; */
-  /* if (STATES == 2) { */
+  /* if (states == 2) { */
   /*   char* eptr; */
   /*   rule_number = strtoul(argv[1], &eptr, 10); */
   /*   for (int s = 0 ; s < RULE_SIZE ; ++s) { */
-  /*     rule_array[s] = (uint8_t)((rule_number / (int)ipow(STATES, s)) % STATES); */
+  /*     rule_array[s] = (uint8_t)((rule_number / (int)ipow(states, s)) % STATES); */
   /*   } */
 
   /*   const int n = snprintf(NULL, 0, "%lu", rule_number); */
@@ -429,10 +434,11 @@ void build_rule_from_args(uint64_t grule_size,
   /*   rule_buf[RULE_SIZE] = '\0'; */
   /* } */
 
-  /* Rule is given in base-(STATES - 1) format */
+  /* Rule is given in base-(states - 1) format */
   for (int s = 0 ; s < grule_size; ++s) {
     rule_array[s] = rule_arg[s] - '0';
     rule_buf[s] = rule_arg[s];
+    assert(rule_array[s] < states);
   }
   rule_buf[grule_size] = '\0';
 }
@@ -442,19 +448,20 @@ void build_rule_from_args(uint64_t grule_size,
  */
 void generate_general_rule(uint64_t grule_size,
                            uint8_t rule_array[grule_size],
-                           char rule_buf[grule_size + 1])
+                           char rule_buf[grule_size + 1],
+                           int states, int horizon)
 {
-  int ur = 2 + rand()%7;
+  int ur = 1 + rand()%8;
   for (int v = 0; v < grule_size; v++) {
     if (rand() % 10 < ur) {
       rule_array[v] = 1;
     } else {
-      rule_array[v] = (uint8_t)(rand() % STATES);
+      rule_array[v] = (uint8_t)(rand() % states);
     }
-    /* rule_array[v] = (uint8_t)(rand() % STATES); */
+    /* rule_array[v] = (uint8_t)(rand() % states); */
   }
 
-  symmetrize_rule(grule_size, rule_array);
+  symmetrize_rule(grule_size, rule_array, states, horizon);
 
   for (int v = 0; v < grule_size; v++) {
     sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
