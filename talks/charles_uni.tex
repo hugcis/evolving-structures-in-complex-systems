@@ -1,0 +1,381 @@
+\documentclass[xcolor=dvipsnames]{beamer}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{animate}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+\addtobeamertemplate{navigation symbols}{}{%
+    \usebeamerfont{footline}%
+    \usebeamercolor[fg]{footline}%
+    \hspace{1em}%
+    \insertframenumber/\inserttotalframenumber
+}
+
+\title{Evaluating complexity  in cellular automata}
+\author{Hugo Cisneros}
+\date{May 16th 2019}
+
+\begin{document}
+\maketitle
+
+\begin{frame}{Definition}
+  \begin{block}{Cellular automaton (CA)}
+    A mathematical model composed of \alert{elementary components} (cells) that
+    are updated in discrete time steps according to \alert{local rules}.
+
+
+    The cells can take $k$ possible values (states).
+  \end{block}
+
+  Although very simples, cellular automata exhibit very interesting and unusual
+  properties.
+
+  CAs are defined by a local transition table.
+
+  \vfill
+  \begin{minipage}[h]{.3\linewidth}
+    \textbf{1D Automaton:}
+    \vfill
+
+    \includegraphics[width=.8\linewidth]{../figures/1d_neigh}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[h]{.6\linewidth}
+    \textbf{2D Automaton:}
+    \vfill
+
+    \includegraphics[width=.4\linewidth]{../figures/2d_moore}
+    \hfill
+    \includegraphics[width=.4\linewidth]{../figures/2d_von_neumann}
+  \end{minipage}
+
+
+\end{frame}
+
+\begin{frame}{Wolfram's classification}
+  Wolfram has studied extensively the 1D elementary CA and created a
+  classification of the 256 possible rules into 4 classes.
+  \vfill
+
+  \begin{description}
+  \item[Class 1]<1-| alert@1> Fixed homogeneous state is reached
+  \item[Class 2]<1-| alert@2> A pattern of periodic regions is produced
+  \item[Class 3]<1-| alert@3> A chaotic aperiodic pattern is produced
+  \item[Class 4]<1-| alert@4> Complex localized structures are generated
+  \end{description}
+
+  \begin{minipage}[h]{.04\linewidth}
+    \includegraphics[width=\linewidth]{../figures/time.pdf}
+  \end{minipage}
+  \begin{minipage}[h]{.9\linewidth}
+    \begin{figure}
+      \begin{subfigure}{.49\linewidth}
+        \centering \includegraphics<1>[width=.9\linewidth]{../rule_gif/1d_8}
+        \includegraphics<2>[width=.9\linewidth]{../rule_gif/1d_4}
+        \includegraphics<3>[width=.9\linewidth]{../rule_gif/1d_45}
+        \includegraphics<4>[width=.9\linewidth]{../rule_gif/1d_110}
+        \caption{Rule \only<1>{8}\only<2>{4}\only<3>{45}\only<4>{110}}
+      \end{subfigure}
+      \only<1,2,3>{\begin{subfigure}{.49\linewidth} \centering
+          \includegraphics<1>[width=.9\linewidth]{../rule_gif/1d_253}
+          \includegraphics<2>[width=.9\linewidth]{../rule_gif/1d_37}
+          \includegraphics<3>[width=.9\linewidth]{../rule_gif/1d_30}
+          \caption{Rule \only<1>{253}\only<2>{37}\only<3>{30}}
+        \end{subfigure}}
+    \end{figure}
+  \end{minipage}
+  \only<4>{\textbf{Rule 110 is computationally universal.}}
+\end{frame}
+
+\begin{frame}{Sensitivity to initial state}
+  \begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{.3\linewidth}
+      \includegraphics[width=\linewidth]{../figures/rule_22_chaos}
+      \caption{Chaotic - (Class 3)}
+    \end{subfigure}
+    \begin{subfigure}{.3\linewidth}
+      \includegraphics[width=\linewidth]{../figures/rule_22_order}
+      \caption{Ordered - (Class 2)}
+    \end{subfigure}
+    \begin{subfigure}{.3\linewidth}
+      \includegraphics[width=\linewidth]{../figures/rule_22_stop}
+      \caption{Homogenous - (Class 1)}
+    \end{subfigure}
+    \caption{Rule 22 - Random initial state top left 12 cells. Size: 64 cells,
+      ran for 128 steps}
+  \end{figure}
+
+
+\end{frame}
+
+
+\begin{frame}{Compression based study of 1D CAs}
+  \begin{block}{Idea:}
+    Use the compressed length of a CA state as a proxy for its \emph{complexity}.
+  \end{block}
+  \vfill
+
+  \only<1>{ Many definitions of complexity: here the Kolmogorov complexity is
+    \alert{constant} for a given rule.
+
+    We are looking for a more \emph{qualitative} interpretation of complexity,
+    similar to what human beings perceive.
+  }
+
+
+  \only<2>{
+  A CA state is represented as a string of 0s and 1s (or something else for more
+  states) that can be fed to a compression algorithm (gzip in the rest of the
+  presentation).
+
+  \vfill
+  \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\linewidth]{../figures/compress}
+    \label{fig:string_conv}
+  \end{figure}
+  \vfill
+
+  Examples:
+  \begin{figure}[htbp]
+    \begin{subfigure}{.7\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{../figures/ordered_state_1d}
+    \end{subfigure} \quad $\rightarrow$ \quad $\ell = 13$
+
+
+    \begin{subfigure}{.7\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{../figures/random_state_1d}
+    \end{subfigure} \quad $\rightarrow$ \quad $\ell = 34$
+  \end{figure}
+  }
+\end{frame}
+
+
+\begin{frame}{Compressed length for single-cell initialization}
+  \begin{figure}[h]
+    \centering
+    \includegraphics[width=.5\linewidth]{../figures/one.png}
+    \caption{Single cell activated in initial configuration, evolve an automaton
+    of size 1024 for 512 timesteps}
+    \label{fig:1_cell}
+  \end{figure}
+
+  $\rightarrow$ \textbf{Obtained classification matches exactly the Wolfram
+    ``manual'' classification (originally observed by Zenil, 2010)}
+\end{frame}
+
+
+\begin{frame}{Influence of the compression algorithm}
+  \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=.6\linewidth]
+    {../figures/rules_lowcpx_800bits800ts_rand.pdf}
+
+    \caption{Temporal evolution of compressed length for 3 rules. Comparison of
+      gzip with PAQ}
+    \label{fig:temp_evol}
+  \end{figure}
+
+\end{frame}
+
+
+\begin{frame}{2D CAs}
+
+  With 2D CAs, the number of rules is much higher: $2^{512}$ rules total,
+  $2^{102}$ if we require the rules to have all symmetries.
+  \vfill
+
+  Gets even bigger if we add more states and/or larger neighborhoods.
+  \vfill
+
+  \begin{itemize}
+    \item There is no chance of sampling all the rules (not even a
+      \emph{significant} portion of it)
+    \item Some parts of this space might be more interesting than others
+  \end{itemize}
+  \vfill
+
+  $\rightarrow$ \textbf{We need a way of guiding this search towards
+    \alert{interesting} rules}
+
+\end{frame}
+
+
+\begin{frame}{Compressed length repartition}
+
+  Sample rules at random and compress the state as an ``unrolled string''.
+
+  \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=.5\linewidth]{../figures/2d_compressed_distrib.pdf}
+    \caption{Compressed length distribution for $k=2$, 2D CAs. Grid size is $256
+      \times 256$, automata are ran for 1000 time steps.}
+    \label{fig:comp_length_2d}
+  \end{figure}
+
+\end{frame}
+
+
+\begin{frame}{Extreme cases --- Illustration}
+
+  \begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{.49\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=.9\linewidth]{5}
+      {../rule_gif/pngs/13463141642615599940-}{0}{16}
+      \caption{High compressed length}
+    \end{subfigure}
+    \begin{subfigure}{.49\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=.9\linewidth]{5}
+      {../rule_gif/pngs/3891041186864560738-}{0}{18}
+      \caption{Low compressed length}
+    \end{subfigure}
+  \end{figure}
+
+\end{frame}
+
+
+\begin{frame}{Intermediate cases --- Illustration}
+
+  \begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{.49\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=.9\linewidth]{5}
+      {../rule_gif/pngs/1461082546904894069-}{0}{19}
+      \caption{Compressed length = 2914}
+    \end{subfigure}
+    \begin{subfigure}{.49\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=.9\linewidth]{5}
+      {../rule_gif/pngs/16172727384030072437-}{0}{16}
+      \caption{Compressed length = 6753}
+    \end{subfigure}
+  \end{figure}
+
+\end{frame}
+
+
+\begin{frame}{Beyond compressed length}
+  Compressed length is not the right metric for 2D CAs
+  \begin{itemize}
+    \item Most rules are at the extremes of the graph.
+    \item \emph{Interesting} rules might have very different compressed lengths,
+      what matters is the \alert{dynamic} of this complexity.
+  \end{itemize}
+
+\end{frame}
+
+
+\begin{frame}{Joint compression score}
+
+  To measure the \alert{stability} of patterns for an evolving 2D CA, we use the
+  joint compression, i.e. the compressed length of the concatenation of two
+  steps relatively far apart in time.
+
+  \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=.6\linewidth]{../figures/joint_compression}
+    \label{fig:joint_comp}
+  \end{figure}
+
+\end{frame}
+
+\begin{frame}{Results on 2D CA rules}
+  The score we compute is $\dfrac{C_1 + C_2}{C_{12}}$. Distribution on the
+  histogram below.
+
+  \begin{minipage}[h]{.49\linewidth}
+    \begin{figure}[htbp]
+      \centering
+      \includegraphics[width=\linewidth]{../figures/hist_score2.pdf}
+      \caption{Joint compression score for 13000 random rules}
+      \label{fig:joint_hist}
+    \end{figure}
+  \end{minipage}
+  \begin{minipage}[h]{.49\linewidth}
+    Two parts:
+    \begin{itemize}
+    \item A large portion of rules that have \textbf{very high compressed length
+        and no structure} (low joint compression score).
+    \item Other group ($\sim$1\%)that seems to have \textbf{much more structure}
+      (although not all rules do and not all ``structured rules'' exhibit
+      interesting behavior).
+    \end{itemize}
+  \end{minipage}
+
+\end{frame}
+
+\begin{frame}{Example rules --- 2 states}
+  \begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{.32\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=\linewidth]{5}
+      {../rule_gif/pngs/5526130398097930830-}{0}{19}
+    \end{subfigure}
+    \begin{subfigure}{.32\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=\linewidth]{5}
+      {../rule_gif/pngs/6349956867804255879-}{0}{18}
+    \end{subfigure}
+    \begin{subfigure}{.32\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=\linewidth]{5}
+      {../rule_gif/pngs/6116844074278280215-}{0}{16}
+    \end{subfigure}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{3 States --- 2D CAs}
+  \begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{.49\linewidth}
+      \centering
+      \includegraphics[width=.9\linewidth]{../figures/hist_score3.pdf}
+      \caption{Score histogram for 3-states automata}
+    \end{subfigure}
+    \begin{subfigure}{.49\linewidth}
+      \centering
+      \includegraphics[width=.9\linewidth]{../figures/2d_compressed_distrib3}
+      \caption{Compressed length histogram for 3-states automata}
+    \end{subfigure}
+  \end{figure}
+
+  Similar distributions $\rightarrow$ if this can be generalized, this would be
+  a first toward creating a systematic approach for finding interesting rules.
+\end{frame}
+
+\begin{frame}{Example rules --- 3 states}
+  \begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{.49\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=\linewidth]{5}
+      {../rule_gif/pngs/2656185470595024321_3-}{0}{19}
+    \end{subfigure}
+    \begin{subfigure}{.49\linewidth}
+      \centering
+      \animategraphics[loop,controls,width=\linewidth]{5}
+      {../rule_gif/pngs/6395857399678607410_3-}{0}{18}
+    \end{subfigure}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Further work}
+  \begin{itemize}
+    \item Study the influence of the initial state.
+    \item Add some input/output capabilities ?
+    \item Refine the metric or find some other ?
+  \end{itemize}
+
+\end{frame}
+
+
+\end{document}
