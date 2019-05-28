@@ -170,16 +170,29 @@
 
 
 \begin{frame}{Influence of the compression algorithm}
-  \begin{figure}[htbp]
-    \centering
-    \includegraphics[width=.6\linewidth]
-    {../figures/rules_lowcpx_800bits800ts_rand.pdf}
+  \textbf{Setting: } Random initialization for 3 rules, the state is compressed
+  every 50 timesteps.
 
-    \caption{Temporal evolution of compressed length for 3 rules. Comparison of
-      gzip with PAQ}
-    \label{fig:temp_evol}
-  \end{figure}
 
+  \begin{minipage}[h]{.5\linewidth}
+    \begin{figure}[htbp]
+      \centering \includegraphics[width=\linewidth]
+      {../figures/rules_lowcpx_800bits800ts_rand.pdf}
+
+      \caption{Temporal evolution of compressed length for 3 rules. Comparison
+        of gzip with PAQ}
+      \label{fig:temp_evol}
+    \end{figure}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[h]{.45\linewidth}
+    \begin{figure}[htbp]
+      \centering
+      \includegraphics[width=\linewidth]{../figures/order_increase}
+      \caption{Rule 82}
+    \end{figure}
+
+  \end{minipage}
 \end{frame}
 
 
@@ -226,13 +239,17 @@
     \centering
     \begin{subfigure}{.49\linewidth}
       \centering
-      \animategraphics[loop,controls,width=.9\linewidth]{5}
+      % \includegraphics[width=\linewidth]
+      % {../rule_gif/pngs/13463141642615599940-10}
+      \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/13463141642615599940-}{0}{16}
       \caption{High compressed length}
     \end{subfigure}
     \begin{subfigure}{.49\linewidth}
       \centering
-      \animategraphics[loop,controls,width=.9\linewidth]{5}
+      % \includegraphics[width=\linewidth]
+      % {../rule_gif/pngs/3891041186864560738-10}
+      \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/3891041186864560738-}{0}{18}
       \caption{Low compressed length}
     \end{subfigure}
@@ -247,13 +264,17 @@
     \centering
     \begin{subfigure}{.49\linewidth}
       \centering
-      \animategraphics[loop,controls,width=.9\linewidth]{5}
+      % \includegraphics[width=\linewidth]
+      % {../rule_gif/pngs/1461082546904894069-15}
+      \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/1461082546904894069-}{0}{19}
       \caption{Compressed length = 2914}
     \end{subfigure}
     \begin{subfigure}{.49\linewidth}
       \centering
-      \animategraphics[loop,controls,width=.9\linewidth]{5}
+      % \includegraphics[width=\linewidth]
+      % {../rule_gif/pngs/16172727384030072437-15}
+      \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/16172727384030072437-}{0}{16}
       \caption{Compressed length = 6753}
     \end{subfigure}
@@ -295,7 +316,7 @@
     \begin{figure}[htbp]
       \centering
       \includegraphics[width=\linewidth]{../figures/hist_score2.pdf}
-      \caption{Joint compression score for 13000 random rules}
+      \caption{Histogram of joint compression score for 13000 random rules}
       \label{fig:joint_hist}
     \end{figure}
   \end{minipage}
@@ -317,21 +338,60 @@
     \centering
     \begin{subfigure}{.32\linewidth}
       \centering
+      % \includegraphics[width=\linewidth]
+      % {../rule_gif/pngs/5526130398097930830-15}
       \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/5526130398097930830-}{0}{19}
     \end{subfigure}
     \begin{subfigure}{.32\linewidth}
       \centering
+      % \includegraphics[width=.9\linewidth]
+      % {../rule_gif/pngs/6349956867804255879-15}
       \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/6349956867804255879-}{0}{18}
     \end{subfigure}
     \begin{subfigure}{.32\linewidth}
       \centering
+      % \includegraphics[width=\linewidth]
+      % {../rule_gif/pngs/6116844074278280215-15}
       \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/6116844074278280215-}{0}{16}
     \end{subfigure}
   \end{figure}
 \end{frame}
+
+\begin{frame}{Langton's lambda parameter}
+  The lambda parameter is defined with respect to a \emph{quescient} state
+  (usually \texttt{0}), as the proportion of transitions that lead to any other
+  state.
+  \vfill
+
+
+  Example of 1D rule 22:
+  \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=.5\linewidth]{../figures/rule_22_transitions}
+  \end{figure}
+
+  $$\boxed{\lambda = \frac{3}{8}}$$
+\end{frame}
+
+
+\begin{frame}{Relation to lambda parameter}
+  The vast majority of rules of 2-states 2D CAs have a $\lambda$ close to 0.5.
+
+
+  For the graph below the rules were sampled with a $lambda$ uniform over $[0,
+  1]$.
+  \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=.6\linewidth]{../figures/lambda_prop}
+    \caption{Proportion of rules that would qualify as interesting with the
+      defined scheme}
+  \end{figure}
+
+\end{frame}
+
 
 \begin{frame}{3 States --- 2D CAs}
   \begin{figure}[htbp]
@@ -357,11 +417,15 @@
     \centering
     \begin{subfigure}{.49\linewidth}
       \centering
+      % \includegraphics[width=\linewidth]
+      % {../rule_gif/pngs/2656185470595024321_3-15}
       \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/2656185470595024321_3-}{0}{19}
     \end{subfigure}
     \begin{subfigure}{.49\linewidth}
       \centering
+      % \includegraphics[width=\linewidth]
+      % {../rule_gif/pngs/6395857399678607410_3-15}
       \animategraphics[loop,controls,width=\linewidth]{5}
       {../rule_gif/pngs/6395857399678607410_3-}{0}{18}
     \end{subfigure}
@@ -375,6 +439,21 @@
     \item Refine the metric or find some other ?
   \end{itemize}
 
+\end{frame}
+
+\begin{frame}{}
+  \begin{minipage}[h]{.3\linewidth}
+    {\bf \Large
+      \begin{center}
+        Thank you for your attention!
+      \end{center}}
+  \end{minipage}
+  \begin{minipage}[h]{.68\linewidth}
+      % \includegraphics[width=1.2\linewidth]
+      % {../rule_gif/pngs/17049424499849263338_3-140}
+      \animategraphics[loop,width=1.2\linewidth]{40}
+      {../rule_gif/pngs/17049424499849263338_3-}{0}{173}
+  \end{minipage}
 \end{frame}
 
 
