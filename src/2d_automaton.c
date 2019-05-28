@@ -250,6 +250,7 @@ int reduce_entropy(any_t state_entropy, any_t in)
         (data->number_array[i]);
     }
   }
+  state_ent->entropy += 1;
   return MAP_OK;
 }
 
@@ -583,11 +584,9 @@ void symmetrize_rule(uint64_t grule_size,
   uint32_t position_dflip;
   uint32_t position_aflip;
 
+  /* grule_size can be very big, this array is better on the heap */
   /* Keep track of already seen positions with book-keeping */
-  uint8_t book_keep[grule_size];
-  for (uint64_t i = 0; i < grule_size; ++i) {
-    book_keep[i] = 0;
-  }
+  uint8_t* book_keep = calloc(grule_size, sizeof(uint8_t));
 
   int pos;
 
@@ -667,6 +666,7 @@ void symmetrize_rule(uint64_t grule_size,
     rule_array[position_dflip] = rule_array[i];
     rule_array[position_aflip] = rule_array[i];
   }
+  free(book_keep);
 
 }
 

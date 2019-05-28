@@ -13,6 +13,7 @@ int main_2d(int argc, char** argv)
 {
   char usage[] = "%s 2d [-n n_states] [-i input_rule] [-s size] [-t timesteps]"
     "[-g grain] [-c compress]";
+  char one_input[] = "Give only one input, either -i rule or -f rule_file";
 
 
   extern char *optarg;
@@ -23,17 +24,31 @@ int main_2d(int argc, char** argv)
   int compress_flag = 1;
   size_t size = 256;
   char* input_rule;
+  char* input_fname = NULL;
 
   /* Optional arguments processing */
-  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:")) != -1)
+  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:")) != -1)
     switch (c) {
     case 'n':
       states = atoi(optarg);
       break;
     case 'i':
+      if (input_flag == 1) {
+        fprintf(stderr, one_input, NULL);
+        exit(1);
+      }
       input_flag = 1;
-      input_rule = calloc(strlen(optarg), sizeof(char));
+      input_rule = (char*) calloc(strlen(optarg), sizeof(char));
       strcpy(input_rule, optarg);
+      break;
+    case 'f':
+      if (input_flag == 1) {
+        fprintf(stderr, one_input, NULL);
+        exit(1);
+      }
+      input_flag = 1;
+      input_fname = (char*) calloc(strlen(optarg), sizeof(char));
+      strcpy(input_fname, optarg);
       break;
     case 's':
       size = atol(optarg);
@@ -68,18 +83,46 @@ int main_2d(int argc, char** argv)
   /* Size of rule */
   const uint64_t grule_size = (int) pow(states, neigh_size + 1);
 
-  char rule_buf[grule_size + 1];
-  uint8_t rule_array[grule_size];
+  /* These arrays can be very big and are therefore allocated on the heap */
+  char* rule_buf = malloc(grule_size * sizeof(char));
+  uint8_t* rule_array = malloc(grule_size * sizeof(uint8_t));
 
   FILE* dic_file;
   char* fname;
 
+  /* If input was given, it was either directly or via a file */
+  if (input_fname) {
+    FILE* rule_file;
+    if ((rule_file = fopen(input_fname, "r"))) {
+      uint64_t count = 0;
+      while ((c = getc(rule_file)) != EOF && count < grule_size) {
+        rule_array[count] = (uint8_t)(c - '0');
+        rule_buf[count] = c;
+        count++;
+      }
+      rule_buf[count] = '\0';
+      if (count != grule_size) {
+        fprintf(stderr, "Incorrect rule in file %s", input_fname);
+        exit(1);
+      }
+    }
+    else {
+      fprintf(stderr, "Error while opening file %s", input_fname);
+      exit(1);
+    }
+    free(input_fname);
+  }
+  else if (input_flag == 1) {
+    build_rule_from_args(grule_size, rule_array, rule_buf, input_rule, states);
+    free(input_rule);
+  }
+
 
   /* If input rule was provided, write steps for a given rule  */
   if (input_flag == 1) {
-    build_rule_from_args(grule_size, rule_array, rule_buf, input_rule, states);
-    free(input_rule);
 
+    /* This should not be necessary if the provided rule is already symmetric */
+    /* TODO: Add possibility to work with either type */
     symmetrize_rule(grule_size, rule_array, states, horizon);
 
     asprintf(&fname, "data_2d_%i/map/%lu.map", states, hash(rule_buf));
@@ -92,6 +135,8 @@ int main_2d(int argc, char** argv)
 
     process_rule(grule_size, rule_array, rule_buf,
                  1, 1, 0, timesteps, states, horizon, size, grain);
+    free(rule_array);
+    free(rule_buf);
     return 0;
   }
 
@@ -115,6 +160,8 @@ int main_2d(int argc, char** argv)
                  0, 1, 0, timesteps, states, horizon, size, grain);
   }
   printf("\n");
+  free(rule_array);
+  free(rule_buf);
   return 0;
 }
 
