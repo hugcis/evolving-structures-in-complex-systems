@@ -19,6 +19,7 @@ struct Options1D {
 };
 
 void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
-                   int, int, struct Options1D*);
+                   int, struct Options1D*, int states);
 
-unsigned long rule_number(size_t rule_size, uint8_t rule[rule_size]);
+unsigned long rule_number(int states, size_t rule_size,
+                          uint8_t rule[rule_size]);
