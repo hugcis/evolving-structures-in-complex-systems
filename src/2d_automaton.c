@@ -7,27 +7,25 @@
 #include <inttypes.h>
 #include "2d_automaton.h"
 #include "compress.h"
+#include "utils.h"
+#include "hashmap.h"
 
-#define GRAIN 50
+#define KEY_MAX_LENGTH (256)
 
-typedef void (*ProcessF)(uint64_t, uint8_t[][N] , size_t,
+typedef void (*ProcessF)(uint64_t, size_t size, uint8_t[size][size],
                          uint8_t[] , uint8_t**, int, int);
 
-uint32_t ipow(int base, int exp)
+typedef struct entrop_state_ph_s
 {
-    uint32_t result = 1;
-    for (;;)
-    {
-        if (exp & 1)
-            result *= base;
-        exp >>= 1;
-        if (!exp)
-            break;
-        base *= base;
-    }
+  double entropy;
+  int states;
+} entrop_state_ph_t;
 
-    return result;
-}
+typedef struct data_struct_s
+{
+  char key_string[KEY_MAX_LENGTH];
+  double* number_array;
+} data_struct_t;
 
 unsigned long hash(char *str)
 {
@@ -44,7 +42,7 @@ unsigned long hash(char *str)
 /**
  * Format the 2d automaton as a string in buf.
  */
-void print_bits(uint8_t a[][N], size_t dim1, size_t dim2, char* buf)
+void print_bits(size_t dim1, size_t dim2, uint8_t a[dim1][dim2], char* buf)
 {
   char out_string = '0';
 
@@ -83,24 +81,32 @@ void print_aggregated_bits(size_t dim1, size_t dim2, uint8_t a[][dim2],
   buf[(inc1 - 1) * (dim1/offset + 1) + inc2 + 1] = '\0';
 }
 
-void init_automat(uint8_t a[][N], size_t size, int states)
+void init_automat(size_t size, uint8_t a[size][size], int states)
 {
   assert(size > 20);
-  time_t t;
-  srand((unsigned)time(&t));
-  for (size_t i = size / 2 - 10; i < size / 2 + 10; i++) {
-    for (size_t j = size / 2 - 10; j < size / 2 + 10; j++) {
-      a[i % size][j % size] = rand() % states;
+  for (size_t i = 0; i < size; i++) {
+    for (size_t j = 0; j < size; j++) {
+      /* Initialize center 20x20 square to random */
+      if ((i >= size/2 - 10) && (i < size/2 + 10) &&
+          (j >= size/2 - 10) && (j < size/2 + 10)) {
+        a[i % size][j % size] = (uint8_t)(rand() % states);
+      }
+      /* Rest is 0 */
+      else {
+        a[i][j] = (uint8_t)0;
+      }
     }
   }
 }
 
-void update_step_general(uint64_t grule_size, uint8_t base[][N], size_t size,
-                         uint8_t rule[grule_size], uint8_t** A, int states,
+void update_step_general(uint64_t grule_size, size_t size,
+                         uint8_t base[size][size],
+                         uint8_t rule[grule_size],
+                         uint8_t** A, int states,
                          int horizon)
 {
   uint64_t position;
-  int current_value;
+  uint8_t current_value;
   int increment;
 
   for (size_t i = 0; i < size; i++) {
@@ -116,6 +122,7 @@ void update_step_general(uint64_t grule_size, uint8_t base[][N], size_t size,
           ++increment;
         }
       }
+
       A[i][j] = rule[position];
     }
   }
@@ -124,8 +131,10 @@ void update_step_general(uint64_t grule_size, uint8_t base[][N], size_t size,
   }
 }
 
-void update_step_totalistic(uint64_t rule_size, uint8_t base[][N], size_t size,
-                            uint8_t rule[rule_size], uint8_t** A, int states,
+void update_step_totalistic(uint64_t rule_size, size_t size,
+                            uint8_t base[size][size],
+                            uint8_t rule[rule_size],
+                            uint8_t** A, int states,
                             int horizon)
 {
   int count;
@@ -149,12 +158,12 @@ void update_step_totalistic(uint64_t rule_size, uint8_t base[][N], size_t size,
   }
 }
 
-int count_cells(uint8_t A[N][N], size_t size, int states)
+int count_cells(size_t size, uint8_t A[size][size], int states)
 {
   assert(A && size);
   int* counts = (int*)calloc(states, sizeof(int));
-  for (int i = 0; i < size; ++i) {
-    for (int j = 0; j < size; ++j) {
+  for (size_t i = 0; i < size; ++i) {
+    for (size_t j = 0; j < size; ++j) {
       counts[A[i][j]] += 1;
     }
   }
@@ -164,7 +173,137 @@ int count_cells(uint8_t A[N][N], size_t size, int states)
       value = counts[i];
     }
   }
+  free(counts);
   return value + 1;
+}
+
+int normalize_probs(any_t states, any_t data)
+{
+  data_struct_t* in = (data_struct_t*) data;
+  int st = *(int*)states;
+  double sum = 0;
+  for (int i = 0; i < st; i++) {
+    sum += in->number_array[i];
+  }
+  for (int i = 0; i < st; i++) {
+    in->number_array[i] /= sum;
+  }
+  return MAP_OK;
+}
+
+void build_key_string(int key_len, char key[key_len],
+                      size_t size, uint8_t automaton[size][size],
+                      int offset, size_t i, size_t j)
+{
+  int key_index;
+  for (int a = -offset; a < offset + 1; a++) {
+    for (int b = -offset; b < offset + 1; b++) {
+      key_index = (a + offset) * (2 * offset + 1) + (b + offset);
+      if (a == 0 && b == 0) {
+        key[key_index] = 'x';
+      }
+      else {
+        key[key_index] =
+          '0' + automaton[(i + a + size) % size][(j + b + size) % size];
+      }
+    }
+  }
+  key[key_len - 1] = '\0';
+}
+
+void populate_map(map_t* map, size_t size, uint8_t automaton[size][size],
+                  int offset, int states)
+{
+  data_struct_t* value;
+  int key_len = (2*offset + 1) * (2*offset + 1) + 1;
+  char key[key_len];
+  int error;
+
+  for (size_t i = 0; i < size; i++) {
+    for (size_t j = 0; j < size; j++) {
+      build_key_string(key_len, key, size, automaton, offset, i, j);
+      error = hashmap_get(map, key, (void**)(&value));
+
+      if (error==MAP_MISSING) {
+        value = malloc(sizeof(data_struct_t));
+
+        snprintf(value->key_string, key_len, "%s", key);
+        value->number_array = (double*)calloc(states, sizeof(double));
+
+        error = hashmap_put(map, value->key_string, value);
+        assert(error==MAP_OK);
+      }
+      value->number_array[automaton[i][j]] += 1;
+    }
+  }
+  hashmap_iterate(map, (PFany)&normalize_probs, (any_t)&states);
+}
+
+int reduce_entropy(any_t state_entropy, any_t in)
+{
+  entrop_state_ph_t* state_ent = (entrop_state_ph_t*) state_entropy;
+  data_struct_t* data = (data_struct_t*) in;
+
+  for (int i = 0; i < state_ent->states; i ++) {
+    if (data->number_array[i] > 0) {
+      state_ent->entropy += -log(data->number_array[i]) *
+        (data->number_array[i]);
+    }
+  }
+  return MAP_OK;
+}
+
+double entropy_score(map_t map, int states)
+{
+  double ret_entropy;
+  entrop_state_ph_t* ph = calloc(1, sizeof(entrop_state_ph_t));
+  ph->states = states;
+  hashmap_iterate(map, (PFany)&reduce_entropy, (any_t)ph);
+
+  ret_entropy = ph->entropy;
+  free(ph);
+  return ret_entropy;
+}
+
+double predictive_score(map_t map, int states, size_t size,
+                        uint8_t automaton[size][size], int offset)
+{
+  data_struct_t* value;
+  int key_len = (2*offset + 1) * (2*offset + 1) + 1;
+  char key[key_len];
+  int error;
+  double result = 0;
+
+  for (size_t i = 0; i < size; i++) {
+    for (size_t j = 0; j < size; j++) {
+      build_key_string(key_len, key, size, automaton, offset, i, j);
+      error = hashmap_get(map, key, (void**)(&value));
+      if (error==MAP_MISSING) {
+        result += 1/(double)states;
+      }
+      else {
+        result += value->number_array[automaton[i][j]];
+      }
+    }
+  }
+  return result / (double)(size * size);
+}
+
+int free_data(any_t _, any_t in)
+{
+  (void)(_); /* Unused parameter */
+  data_struct_t* data = (data_struct_t*) in;
+  free(data->number_array);
+  free(data);
+  data = NULL;
+
+  return MAP_OK;
+}
+
+void free_map(map_t map)
+{
+  hashmap_iterate(map, (PFany)&free_data, NULL);
+  hashmap_free(map);
 }
 
 /**
@@ -172,84 +311,109 @@ int count_cells(uint8_t A[N][N], size_t size, int states)
  */
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[], int save_steps, int joint_complexity,
-                  int totalistic, long steps, int states, int horizon)
+                  int totalistic, long steps, int states, int horizon,
+                  size_t size, int grain)
 {
-  FILE* out_file;
+  FILE* out_file = NULL;
   char* fname;
+
+  FILE* mult_time_file;
+  char* mult_time_fname;
+
+  FILE* entrop_file = NULL;
+  char* entrop_fname;
+
   int last_compressed_size;
   int compressed_size;
   /* int agg_compressed_size; */
   int last_cell_count;
   int cell_count = 0;
   int size_sum;
+  int offset_a = 2, offset_b = 1;
   float ratio = 0;
   float ratio2 = 0;
 
   ProcessF process_function = totalistic == 1 ?
     update_step_totalistic: update_step_general;
 
-  asprintf(&fname, "data_2d_%i/out%s.dat", states, rule_buf);
+  asprintf(&fname, "data_2d_%i/out/out%s.dat", states, rule_buf);
   out_file = fopen(fname, "w+");
 
-  uint8_t A[N][N] = { {} };
-  init_automat(A, N, states);
+  asprintf(&mult_time_fname, "data_2d_%i/mult/mult%s.dat", states, rule_buf);
+  mult_time_file = fopen(mult_time_fname, "w+");
 
-  uint8_t** placeholder = (uint8_t**)malloc(N * sizeof(uint8_t*));
-  for (int i = 0; i < N; i++) {
-    placeholder[i] = (uint8_t*)malloc(N * sizeof(uint8_t));
+
+  uint8_t A[size][size];
+  init_automat(size, A, states);
+
+  uint8_t** placeholder = (uint8_t**)malloc(size * sizeof(uint8_t*));
+  for (size_t i = 0; i < size; i++) {
+    placeholder[i] = (uint8_t*)malloc(size * sizeof(uint8_t));
   }
 
-  char double_placeholder[2 * ((N + 1) * N + 1)];
-  char out_string[(N+1) * N + 1];
+  char dbl_pholder[2 * ((size + 1) * size + 1)];
+  char out_string[(size + 1) * size + 1];
+  char out_string300[(size + 1) * size + 1];
+  char out_string200[(size + 1) * size + 1];
+  char out_string100[(size + 1) * size + 1];
+  char out_string50[(size + 1) * size + 1];
+  char out_string10[(size + 1) * size + 1];
+  char out_string5[(size + 1) * size + 1];
+  int dbl_cmp300, dbl_cmp200, dbl_cmp100, dbl_cmp50, dbl_cmp10, dbl_cmp5;
+
+  map_t map300 = hashmap_new();
+  map_t map50 = hashmap_new();
+  map_t map5 = hashmap_new();
+  map_t map300b = hashmap_new();
+  map_t map50b = hashmap_new();
+  map_t map5b = hashmap_new();
+
   int flag = 0;
 
   for (int i = 0; i < steps; i++) {
-    process_function(grule_size, A, N, rule, placeholder, states, horizon);
+    process_function(grule_size, size, A, rule, placeholder, states, horizon);
 
-    if (i % GRAIN == 0) {
+    if (i % grain == 0) {
       last_compressed_size = compressed_size;
       last_cell_count = cell_count;
 
-      /* print_aggregated_bits(N, N, A, out_string, 2); */
-      /* agg_compressed_size = compress_memory_size(out_string, (N/2 + 1) * N); */
+      /* print_aggregated_bits(size, size, A, out_string, 2); */
+      /* agg_compressed_size = compress_memory_size(out_string,
+         (size/2 + 1) * size); */
 
-      print_bits(A, N, N, out_string);
-      compressed_size = compress_memory_size(out_string, (N + 1) * N);
-      cell_count = count_cells(A, N, states);
+      print_bits(size, size, A, out_string);
+      compressed_size = compress_memory_size(out_string, (size + 1) * size);
+      cell_count = count_cells(size, A, states);
 
       /* Check if state has evolved from last time */
       if (compressed_size == last_compressed_size && flag == 1) {
         printf("\n");
         /* Cleanup before returning */
-        for (int i = 0; i < N; i++) {
-          free(placeholder[i]);
-        }
-        free(placeholder);
-        fclose(out_file);
-        return;
+        break;
       } else if (compressed_size == last_compressed_size) {
         flag = 1;
       }
 
       if (joint_complexity == 1) {
-        memcpy(&double_placeholder[(N + 1) * N + 1],
-               out_string, (N + 1) * N + 1);
+        memcpy(&dbl_pholder[(size + 1) * size + 1],
+               out_string, (size + 1) * size + 1);
 
-        int double_compressed_size =
-          compress_memory_size(double_placeholder, 2 * ((N + 1) * N + 1));
+        int dbl_comp_size =
+          compress_memory_size(dbl_pholder, 2 * ((size + 1) * size + 1));
 
-        memcpy(double_placeholder, out_string, (N + 1) * N + 1);
+        memcpy(dbl_pholder, out_string, (size + 1) * size + 1);
 
         if (i > 0) {
           size_sum = last_compressed_size + compressed_size;
-          ratio2 = (size_sum - double_compressed_size)/(float)size_sum;
+          ratio2 = (size_sum - dbl_comp_size)/(float)size_sum;
           ratio = ( (last_compressed_size / (float)last_cell_count) +
                     (compressed_size / (float)cell_count) ) /
-            (double_compressed_size / (float)(last_cell_count + cell_count));
+            (dbl_comp_size / (float)(last_cell_count + cell_count));
         }
-        fprintf(out_file, "%i    %i    %f    %f    %i    %i    %i\n",
+        fprintf(out_file, "%i    %i    %f    %f"
+                          "%i    %i    %i\n",
                 i, compressed_size, ratio, ratio2, cell_count, last_cell_count,
-                double_compressed_size);
+                dbl_comp_size);
       } else {
         fprintf(out_file, "%i    %i\n", i, compressed_size);
       }
@@ -263,17 +427,122 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
         asprintf(&step_fname, "step_2d_%i/out%s_%i.step",
                  states, rule_buf, i);
         out_step_file = fopen(step_fname, "w+");
+        free(step_fname);
         fprintf(out_step_file, "%s", out_string);
         fclose(out_step_file);
       }
     }
+
+    if (i == steps - 300) {
+      print_bits(size, size, A, out_string300);
+      populate_map(map300, size, A, offset_a, states);
+      populate_map(map300b, size, A, offset_b, states);
+    }
+    if (i == steps - 200) {
+      print_bits(size, size, A, out_string200);
+    }
+    if (i == steps - 100) {
+      print_bits(size, size, A, out_string100);
+    }
+    if (i == steps - 50) {
+      print_bits(size, size, A, out_string50);
+      populate_map(map50, size, A, offset_a, states);
+      populate_map(map50b, size, A, offset_b, states);
+    }
+    if (i == steps - 10) {
+      print_bits(size, size, A, out_string10);
+    }
+    if (i == steps - 5) {
+      print_bits(size, size, A, out_string5);
+      populate_map(map5, size, A, offset_a, states);
+      populate_map(map5b, size, A, offset_b, states);
+    }
+    if (i == steps - 1) {
+      print_bits(size, size, A, out_string);
+      memcpy(&dbl_pholder[(size + 1) * size + 1],
+             out_string, (size + 1) * size + 1);
+
+      memcpy(dbl_pholder, out_string300, (size + 1) * size + 1);
+      dbl_cmp300 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string200, (size + 1) * size + 1);
+      dbl_cmp200 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string100, (size + 1) * size + 1);
+      dbl_cmp100 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string50, (size + 1) * size + 1);
+      dbl_cmp50 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string10, (size + 1) * size + 1);
+      dbl_cmp10 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string5, (size + 1) * size + 1);
+      dbl_cmp5 = compress_memory_size(dbl_pholder,
+                                       2 * ((size + 1) * size + 1));
+
+      fprintf(mult_time_file, "%i    %i    %i    %i    "
+                              "%i    %i    %i    %i    "
+                              "%i    %i    %i    %i    "
+                              "%i\n",
+              compress_memory_size(out_string, (size + 1) * size),
+              dbl_cmp5,
+              compress_memory_size(out_string5, (size + 1) * size),
+              dbl_cmp10,
+              compress_memory_size(out_string10, (size + 1) * size),
+              dbl_cmp50,
+              compress_memory_size(out_string50, (size + 1) * size),
+              dbl_cmp100,
+              compress_memory_size(out_string100, (size + 1) * size),
+              dbl_cmp200,
+              compress_memory_size(out_string200, (size + 1) * size),
+              dbl_cmp300,
+              compress_memory_size(out_string300, (size + 1) * size));
+
+      asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
+      entrop_file = fopen(entrop_fname, "w+");
+
+      fprintf(entrop_file, "%f    %f    %f    %f    %f    %f\n",
+              predictive_score(map300, states, size, A, offset_a),
+              entropy_score(map300, states),
+              predictive_score(map50, states, size, A, offset_a),
+              entropy_score(map50, states),
+              predictive_score(map5, states, size, A, offset_a),
+              entropy_score(map5, states));
+
+      fprintf(entrop_file, "%f    %f    %f    %f    %f    %f\n",
+              predictive_score(map300b, states, size, A, offset_b),
+              entropy_score(map300b, states),
+              predictive_score(map50b, states, size, A, offset_b),
+              entropy_score(map50b, states),
+              predictive_score(map5b, states, size, A, offset_b),
+              entropy_score(map5b, states));
+
+    }
   }
   printf("\n");
 
-  for (int i = 0; i < N; i++) {
+  /* Cleanup before finishing */
+  for (size_t i = 0; i < size; i++) {
     free(placeholder[i]);
   }
   free(placeholder);
+
+  free_map(map5);
+  free_map(map300);
+  free_map(map50);
+  free_map(map5b);
+  free_map(map300b);
+  free_map(map50b);
+
+  free(fname);
+  free(mult_time_fname);
+
+  if (entrop_file) {
+    free(entrop_fname);
+    fclose(entrop_file);
+  }
+  fclose(mult_time_file);
   fclose(out_file);
 }
 
@@ -282,7 +551,7 @@ void generate_totalistic_rule(uint64_t rule_size, uint8_t rule_array[rule_size],
 {
   unsigned long rule_number = 0UL;
 
-  for (int s = 0 ; s < rule_size; ++s) {
+  for (uint64_t s = 0 ; s < rule_size; ++s) {
     rule_array[s] = rand() % states;
     rule_number += rule_array[s] * ipow(states, s);
     if (states >= 3) {
@@ -316,13 +585,13 @@ void symmetrize_rule(uint64_t grule_size,
 
   /* Keep track of already seen positions with book-keeping */
   uint8_t book_keep[grule_size];
-  for (int i = 0; i < grule_size; ++i) {
+  for (uint64_t i = 0; i < grule_size; ++i) {
     book_keep[i] = 0;
   }
 
   int pos;
 
-  for (int i = 0; i < grule_size; ++i) {
+  for (uint64_t i = 0; i < grule_size; ++i) {
     /* Skip already seen positions when looping through the rule */
     if (book_keep[i] == 1) {
       continue;
@@ -435,7 +704,7 @@ void build_rule_from_args(uint64_t grule_size,
   /* } */
 
   /* Rule is given in base-(states - 1) format */
-  for (int s = 0 ; s < grule_size; ++s) {
+  for (uint64_t s = 0 ; s < grule_size; ++s) {
     rule_array[s] = rule_arg[s] - '0';
     rule_buf[s] = rule_arg[s];
     assert(rule_array[s] < states);
@@ -451,19 +720,25 @@ void generate_general_rule(uint64_t grule_size,
                            char rule_buf[grule_size + 1],
                            int states, int horizon)
 {
-  int ur = 1 + rand()%8;
-  for (int v = 0; v < grule_size; v++) {
-    if (rand() % 10 < ur) {
-      rule_array[v] = 1;
-    } else {
-      rule_array[v] = (uint8_t)(rand() % states);
+  /* The following implements a Uniform-lambda sampling strategy */
+
+  /* Choose lambda parameter at random */
+  float lambda = (double)rand() / (double)((unsigned)RAND_MAX + 1);
+
+  for (uint64_t v = 0; v < grule_size; v++) {
+    /* Assign with probability lambda to a "live" state */
+    if ((double)rand() / (double)((unsigned)RAND_MAX + 1) < lambda) {
+      rule_array[v] = (uint8_t)(1 + (rand() % (states - 1)));
+    }
+    else {
+      rule_array[v] = (uint8_t)0;
     }
     /* rule_array[v] = (uint8_t)(rand() % states); */
   }
 
   symmetrize_rule(grule_size, rule_array, states, horizon);
 
-  for (int v = 0; v < grule_size; v++) {
+  for (uint64_t v = 0; v < grule_size; v++) {
     sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
   }
 }

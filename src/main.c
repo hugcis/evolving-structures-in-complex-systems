@@ -5,21 +5,27 @@
 #include <stdlib.h>
 #include "2d_automaton.h"
 #include "wolfram_automaton.h"
-
-#define STEPS 1000
+#include "utils.h"
 
 const char help[] = "Use with either 2d or 1d as first argument";
 
 int main_2d(int argc, char** argv)
 {
+  char usage[] = "%s 2d [-n n_states] [-i input_rule] [-s size] [-t timesteps]"
+    "[-g grain] [-c compress]";
+
+
   extern char *optarg;
   extern int optind;
   int c, err = 0, input_flag = 0;
-  int states = 2;
-  int horizon = 1;
+  int states = 2, grain = 100;
+  int timesteps = 1000, horizon = 1, n_simulations = 1000;
+  int compress_flag = 1;
+  size_t size = 256;
   char* input_rule;
 
-  while ((c = getopt(argc - 1, &argv[1], "n:i:")) != -1)
+  /* Optional arguments processing */
+  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:")) != -1)
     switch (c) {
     case 'n':
       states = atoi(optarg);
@@ -29,15 +35,33 @@ int main_2d(int argc, char** argv)
       input_rule = calloc(strlen(optarg), sizeof(char));
       strcpy(input_rule, optarg);
       break;
+    case 's':
+      size = atol(optarg);
+      break;
+    case 't':
+      timesteps = atoi(optarg);
+      break;
+    case 'g':
+      grain = atoi(optarg);
+      break;
+    case 'c':
+      compress_flag = 0;
+      break;
+    case 'z':
+      n_simulations = atoi(optarg);
+      break;
     case '?':
       err = 1;
       break;
     }
 
   if (err) {
-    /* fprintf(stderr, usage, argv[0]); */
+    fprintf(stderr, usage, argv[0]);
     exit(1);
   }
+
+  time_t t;
+  srand((unsigned)time(&t));
 
   const int side = 2 * horizon + 1; /* Sidelength of neighborhood */
   const int neigh_size = side * side - 1; /* Total number of neighbors */
@@ -47,39 +71,48 @@ int main_2d(int argc, char** argv)
   char rule_buf[grule_size + 1];
   uint8_t rule_array[grule_size];
 
-  /* Write steps for a given rule  */
+  FILE* dic_file;
+  char* fname;
+
+
+  /* If input rule was provided, write steps for a given rule  */
   if (input_flag == 1) {
     build_rule_from_args(grule_size, rule_array, rule_buf, input_rule, states);
+    free(input_rule);
+
+    symmetrize_rule(grule_size, rule_array, states, horizon);
+
+    asprintf(&fname, "data_2d_%i/map/%lu.map", states, hash(rule_buf));
+    dic_file = fopen(fname, "w+");
+    fprintf(dic_file, "%s", rule_buf);
+    fclose(dic_file);
+
     sprintf(rule_buf, "%lu", hash(rule_buf));
     printf("Rule %s\n", rule_buf);
 
     process_rule(grule_size, rule_array, rule_buf,
-                 1, 1, 0, STEPS, states, horizon);
+                 1, 1, 0, timesteps, states, horizon, size, grain);
     return 0;
   }
 
 
   /* Generate compression plots for many rules */
-  time_t t;
-  srand((unsigned)time(&t));
-  FILE* dic_file;
-  char* fname;
-
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < n_simulations; ++i) {
     /* generate_totalistic_rule(rule_array, rule_buf); */
     generate_general_rule(grule_size, rule_array, rule_buf, states, horizon);
 
-    asprintf(&fname, "data_2d_%i/%lu.map", states, hash(rule_buf));
+    asprintf(&fname, "data_2d_%i/map/%lu.map", states, hash(rule_buf));
     dic_file = fopen(fname, "w+");
     fprintf(dic_file, "%s", rule_buf);
     fclose(dic_file);
+    free(fname);
 
     sprintf(rule_buf, "%lu", hash(rule_buf));
     printf("%i: Rule %s\n", i, rule_buf);
     fflush(stdout);
 
     process_rule(grule_size, rule_array, rule_buf,
-                 0, 1, 0, STEPS, states, horizon);
+                 0, 1, 0, timesteps, states, horizon, size, grain);
   }
   printf("\n");
   return 0;
@@ -98,8 +131,8 @@ int main_1d(int argc, char** argv)
   options.write = NO_WRITE;
 
   char usage[] = "%s 1d [-s size] [-t timesteps]"
-                       "[-n n_states] [-w neighborhood width]"
-                       "[-i (one|random|random_small)] [-o]";
+                 "[-n n_states] [-w neighborhood width]"
+                 "[-i (one|random|random_small)] [-o]";
   char invalid_init[] = "Invalid value \"%s\" for init option."
                         " Must be one of \"one\", \"random\","
                         " \"random_small\"\n";
@@ -107,7 +140,7 @@ int main_1d(int argc, char** argv)
   while ((c = getopt(argc - 1, &argv[1], "s:t:n:w:i:o")) != -1)
     switch (c) {
     case 's':
-      size = atoi(optarg);
+      size = atol(optarg);
       break;
     case 't':
       options.timesteps = atoi(optarg);
@@ -151,13 +184,13 @@ int main_1d(int argc, char** argv)
 
   time_t t;
   srand((unsigned)time(&t));
-
-  for (int n = 0; n < (int)pow(states, rule_size); n++) {
-    for (int i = 0; i < rule_size; ++i) {
-      rule[i] = (n & (1 << i)) ? 1: 0;
+  fprintf(stderr, "%"PRIu64, (uint64_t)pow(states, rule_size));
+  for (uint64_t n = 0; n < (uint64_t)pow(states, rule_size); n++) {
+    for (size_t i = 0; i < rule_size; ++i) {
+      rule[i] = (uint8_t)((n / ipow(states, i)) % states);
     }
-    printf("%lu\t", rule_number(rule_size, rule));
-    write_to_file(size, rule_size, rule, 0, 1, &options);
+    printf("%lu\t", rule_number(states, rule_size, rule));
+    write_to_file(size, rule_size, rule, 0, &options, states);
     printf("\n");
   }
 
