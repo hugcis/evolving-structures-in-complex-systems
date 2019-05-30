@@ -11,6 +11,7 @@
 #include "hashmap.h"
 
 #define KEY_MAX_LENGTH (256)
+#define PERT 1E-15
 
 typedef void (*ProcessF)(uint64_t, size_t size, uint8_t[size][size],
                          uint8_t[] , uint8_t**, int, int);
@@ -18,8 +19,16 @@ typedef void (*ProcessF)(uint64_t, size_t size, uint8_t[size][size],
 typedef struct entrop_state_ph_s
 {
   double entropy;
+  uint32_t visited;
   int states;
 } entrop_state_ph_t;
+
+typedef struct cross_ent_struct_s
+{
+  map_t source_map;
+  int states;
+  double cross_entropy;
+} cross_ent_struct_t;
 
 typedef struct data_struct_s
 {
@@ -250,20 +259,17 @@ int reduce_entropy(any_t state_entropy, any_t in)
         (data->number_array[i]);
     }
   }
-  state_ent->entropy += 1;
+  state_ent->visited += 1;
   return MAP_OK;
 }
 
-double entropy_score(map_t map, int states)
+entrop_state_ph_t* entropy_score(map_t map, int states)
 {
-  double ret_entropy;
   entrop_state_ph_t* ph = calloc(1, sizeof(entrop_state_ph_t));
   ph->states = states;
   hashmap_iterate(map, (PFany)&reduce_entropy, (any_t)ph);
 
-  ret_entropy = ph->entropy;
-  free(ph);
-  return ret_entropy;
+  return ph;
 }
 
 double predictive_score(map_t map, int states, size_t size,
@@ -290,6 +296,54 @@ double predictive_score(map_t map, int states, size_t size,
   return result / (double)(size * size);
 }
 
+double cross_entropy_between_arrays(size_t size, double* source, double* target)
+{
+  double result = 0;
+  for (size_t i = 0; i < size; ++i) {
+    result += -target[i] * log2((source[i] > PERT) ? source[i]: PERT);
+  }
+  return result;
+}
+
+int compute_cross_ent(any_t in_item, any_t in)
+{
+  int error;
+  data_struct_t* source;
+  data_struct_t* target = (data_struct_t*) in;
+  cross_ent_struct_t* item = (cross_ent_struct_t*) in_item;
+  double* base_array = calloc(item->states, sizeof(double));
+  double* ph_array;
+
+  error = hashmap_get(item->source_map, target->key_string, (void**)(&source));
+  if (error==MAP_MISSING) {
+    ph_array = base_array;
+  }
+  else {
+    ph_array = source->number_array;
+  }
+  item->cross_entropy +=
+    cross_entropy_between_arrays(item->states,
+                                 ph_array,
+                                 target->number_array);
+  free(base_array);
+  return MAP_OK;
+}
+
+double map_cross_entropy(map_t map_source, map_t map_target, int states)
+{
+  double cross_ent;
+  cross_ent_struct_t* item = calloc(1, sizeof(cross_ent_struct_t));
+  item->states = states;
+  item->source_map = map_source;
+
+  hashmap_iterate(map_target, (PFany)&compute_cross_ent, item);
+  item->cross_entropy /= (double)hashmap_length(map_target);
+
+  cross_ent = item->cross_entropy;
+  free(item);
+  return cross_ent;
+}
+
 int free_data(any_t _, any_t in)
 {
   (void)(_); /* Unused parameter */
@@ -306,6 +360,17 @@ void free_map(map_t map)
   hashmap_iterate(map, (PFany)&free_data, NULL);
   hashmap_free(map);
 }
+
+void add_results_to_file(map_t map_source, map_t map_target, int states,
+                         FILE* file)
+{
+  entrop_state_ph_t* result = entropy_score(map_source, states);
+  fprintf(file, "%f    %f    %"PRIu32"    ",
+          map_cross_entropy(map_source, map_target, states),
+          result->entropy, result->visited);
+  free(result);
+}
+
 
 /**
  * Given a rule, create and simulate the corresponding automaton.
@@ -368,6 +433,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   map_t map300b = hashmap_new();
   map_t map50b = hashmap_new();
   map_t map5b = hashmap_new();
+
+  map_t map_a = hashmap_new();
+  map_t map_b = hashmap_new();
 
   int flag = 0;
 
@@ -503,22 +571,19 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
       entrop_file = fopen(entrop_fname, "w+");
 
-      fprintf(entrop_file, "%f    %f    %f    %f    %f    %f\n",
-              predictive_score(map300, states, size, A, offset_a),
-              entropy_score(map300, states),
-              predictive_score(map50, states, size, A, offset_a),
-              entropy_score(map50, states),
-              predictive_score(map5, states, size, A, offset_a),
-              entropy_score(map5, states));
+      populate_map(map_a, size, A, offset_a, states);
+      populate_map(map_b, size, A, offset_b, states);
 
-      fprintf(entrop_file, "%f    %f    %f    %f    %f    %f\n",
-              predictive_score(map300b, states, size, A, offset_b),
-              entropy_score(map300b, states),
-              predictive_score(map50b, states, size, A, offset_b),
-              entropy_score(map50b, states),
-              predictive_score(map5b, states, size, A, offset_b),
-              entropy_score(map5b, states));
+      add_results_to_file(map300, map_a, states, entrop_file);
+      add_results_to_file(map50, map_a, states, entrop_file);
+      add_results_to_file(map5, map_a, states, entrop_file);
+      fprintf(entrop_file, "\n");
 
+
+      add_results_to_file(map300b, map_b, states, entrop_file);
+      add_results_to_file(map50b, map_b, states, entrop_file);
+      add_results_to_file(map5b, map_b, states, entrop_file);
+      fprintf(entrop_file, "\n");
     }
   }
   printf("\n");
@@ -535,6 +600,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   free_map(map5b);
   free_map(map300b);
   free_map(map50b);
+
+  free_map(map_a);
+  free_map(map_b);
 
   free(fname);
   free(mult_time_fname);
@@ -671,38 +739,13 @@ void symmetrize_rule(uint64_t grule_size,
 }
 
 /**
- * Build a rule from the provided command-line arguments. Depending on the
- * number of states, it either expect a base-( states - 1 ) input or a base-10
- * input representing the rule.
+ * Build a rule from the provided command-line arguments.
  */
 void build_rule_from_args(uint64_t grule_size,
                           uint8_t rule_array[grule_size],
                           char rule_buf[grule_size + 1],
                           char* rule_arg, int states)
 {
-  /* unsigned long rule_number = 0UL; */
-  /* if (states == 2) { */
-  /*   char* eptr; */
-  /*   rule_number = strtoul(argv[1], &eptr, 10); */
-  /*   for (int s = 0 ; s < RULE_SIZE ; ++s) { */
-  /*     rule_array[s] = (uint8_t)((rule_number / (int)ipow(states, s)) % STATES); */
-  /*   } */
-
-  /*   const int n = snprintf(NULL, 0, "%lu", rule_number); */
-  /*   assert(n > 0); */
-  /*   int c = snprintf(rule_buf, n+1, "%lu", rule_number); */
-  /*   assert(rule_buf[n] == '\0'); */
-  /*   assert(c == n); */
-
-  /* } else { */
-  /*   for (int s = 0 ; s < RULE_SIZE ; ++s) { */
-  /*     rule_array[s] = argv[1][s] - '0'; */
-  /*     printf("%"PRIu8, rule_array[s]); */
-  /*     rule_buf[s] = argv[1][s]; */
-  /*   } */
-  /*   rule_buf[RULE_SIZE] = '\0'; */
-  /* } */
-
   /* Rule is given in base-(states - 1) format */
   for (uint64_t s = 0 ; s < grule_size; ++s) {
     rule_array[s] = rule_arg[s] - '0';
@@ -720,20 +763,23 @@ void generate_general_rule(uint64_t grule_size,
                            char rule_buf[grule_size + 1],
                            int states, int horizon)
 {
+  int inc;
   /* The following implements a Uniform-lambda sampling strategy */
 
   /* Choose lambda parameter at random */
-  float lambda = (double)rand() / (double)((unsigned)RAND_MAX + 1);
+  float lambda[states - 1];
+  for (int i = 0; i < states - 1; ++i) {
+    lambda[i] = ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+  }
 
   for (uint64_t v = 0; v < grule_size; v++) {
     /* Assign with probability lambda to a "live" state */
-    if ((double)rand() / (double)((unsigned)RAND_MAX + 1) < lambda) {
-      rule_array[v] = (uint8_t)(1 + (rand() % (states - 1)));
+    inc = 0;
+    while ((double)rand() / (double)((unsigned)RAND_MAX + 1) > lambda[inc]
+           && inc < states - 1) {
+      inc++;
     }
-    else {
-      rule_array[v] = (uint8_t)0;
-    }
-    /* rule_array[v] = (uint8_t)(rand() % states); */
+    rule_array[v] = (uint8_t)inc;
   }
 
   symmetrize_rule(grule_size, rule_array, states, horizon);
