@@ -6,6 +6,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include "2d_automaton.h"
+#include "nn.h"
 #include "compress.h"
 #include "utils.h"
 #include "hashmap.h"
@@ -13,8 +14,8 @@
 #define KEY_MAX_LENGTH (256)
 #define PERT 1E-15
 
-typedef void (*ProcessF)(uint64_t, size_t size, uint8_t[size][size],
-                         uint8_t[] , uint8_t**, int, int);
+typedef void (*ProcessF)(uint64_t, size_t size, uint8_t [size][size],
+                         uint8_t[] , uint8_t [size][size], int, int);
 
 typedef struct entrop_state_ph_s
 {
@@ -63,31 +64,6 @@ void print_bits(size_t dim1, size_t dim2, uint8_t a[dim1][dim2], char* buf)
     buf[i * (dim1 + 1) + dim2] = '\n';
   }
   buf[(dim1 + 1) * dim2] = '\0';
-}
-
-void print_aggregated_bits(size_t dim1, size_t dim2, uint8_t a[][dim2],
-                           char* buf, int offset)
-{
-  int inc1 = 0;
-  int inc2, counter;
-  char out_string = '0';
-  for (size_t i = 0; i < dim1 - offset + 1; i+=offset) {
-    inc2 = 0;
-    for (size_t j = 0; j < dim2 - offset + 1; j+=offset) {
-      counter = 0;
-      for (int c1 = 0; c1 < offset; ++c1) {
-        for (int c2 = 0; c2 < offset; ++c2) {
-          counter += a[(i + c1) % dim1][(j + c2) % dim2];
-        }
-      }
-      out_string = '0' + counter;
-      buf[inc1 * (dim1/offset + 1) + inc2] = out_string;
-      inc2++;
-    }
-    buf[inc1 * (dim1/offset + 1) + inc2] = '\n';
-    inc1++;
-  }
-  buf[(inc1 - 1) * (dim1/offset + 1) + inc2 + 1] = '\0';
 }
 
 void init_automat(size_t size, uint8_t a[size][size], int states)
@@ -329,15 +305,21 @@ int compute_cross_ent(any_t in_item, any_t in)
   return MAP_OK;
 }
 
-double map_cross_entropy(map_t map_source, map_t map_target, int states)
+double map_cross_entropy(map_t map_source, size_t size,
+                         uint8_t automaton[size][size], int offset, int states)
 {
   double cross_ent;
+  int key_len = (2*offset + 1) * (2*offset + 1) + 1;
+  char key[key_len];
   cross_ent_struct_t* item = calloc(1, sizeof(cross_ent_struct_t));
   item->states = states;
   item->source_map = map_source;
 
-  hashmap_iterate(map_target, (PFany)&compute_cross_ent, item);
-  item->cross_entropy /= (double)hashmap_length(map_target);
+  for (size_t i = 0; i < size; ++i) {
+    for (size_t j = 0; j < size; ++j) {
+      build_key_string(key_len, key, size, automaton, offset, i, j);
+    }
+  }
 
   cross_ent = item->cross_entropy;
   free(item);
@@ -361,12 +343,13 @@ void free_map(map_t map)
   hashmap_free(map);
 }
 
-void add_results_to_file(map_t map_source, map_t map_target, int states,
-                         FILE* file)
+void add_results_to_file(map_t map_source, size_t size,
+                         uint8_t automaton[size][size], int states,
+                         int offset, FILE* file)
 {
   entrop_state_ph_t* result = entropy_score(map_source, states);
   fprintf(file, "%f    %f    %"PRIu32"    ",
-          map_cross_entropy(map_source, map_target, states),
+          predictive_score(map_source, states, size, automaton, offset),
           result->entropy, result->visited);
   free(result);
 }
@@ -410,12 +393,17 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
 
   uint8_t A[size][size];
-  init_automat(size, A, states);
+  uint8_t base[size][size];
 
-  uint8_t** placeholder = (uint8_t**)malloc(size * sizeof(uint8_t*));
-  for (size_t i = 0; i < size; i++) {
-    placeholder[i] = (uint8_t*)malloc(size * sizeof(uint8_t));
-  }
+  uint8_t (*automat5) [size] =
+    (uint8_t (*) [size])malloc(size * size * sizeof(uint8_t));
+  uint8_t (*automat50) [size] =
+    (uint8_t (*) [size])malloc(size * size * sizeof(uint8_t));
+  uint8_t (*automat300) [size] =
+    (uint8_t (*) [size])malloc(size * size * sizeof(uint8_t));
+
+  init_automat(size, A, states);
+  memcpy(base, A, size * size * sizeof(uint8_t));
 
   char dbl_pholder[2 * ((size + 1) * size + 1)];
   char out_string[(size + 1) * size + 1];
@@ -735,7 +723,6 @@ void symmetrize_rule(uint64_t grule_size,
     rule_array[position_aflip] = rule_array[i];
   }
   free(book_keep);
-
 }
 
 /**
@@ -756,7 +743,8 @@ void build_rule_from_args(uint64_t grule_size,
 }
 
 /**
- * Generate a random general rule.
+ * Generate a random general rule. The rule is written to rule_array and a
+ * string  representation is also saved in rule_buf.
  */
 void generate_general_rule(uint64_t grule_size,
                            uint8_t rule_array[grule_size],
@@ -766,15 +754,16 @@ void generate_general_rule(uint64_t grule_size,
   int inc;
   /* The following implements a Uniform-lambda sampling strategy */
 
-  /* Choose lambda parameter at random */
+  /* Choose lambda parameter at random as well as the proportion of */
+  /* transitions to other states*/
   float lambda[states - 1];
   for (int i = 0; i < states - 1; ++i) {
     lambda[i] = ((double)rand() / (double)((unsigned)RAND_MAX + 1));
   }
 
   for (uint64_t v = 0; v < grule_size; v++) {
-    /* Assign with probability lambda to a "live" state */
     inc = 0;
+    /* Assign the rule to the first state that passes the test */
     while ((double)rand() / (double)((unsigned)RAND_MAX + 1) > lambda[inc]
            && inc < states - 1) {
       inc++;
@@ -784,6 +773,7 @@ void generate_general_rule(uint64_t grule_size,
 
   symmetrize_rule(grule_size, rule_array, states, horizon);
 
+  /* Populate buffer with newly created rule */
   for (uint64_t v = 0; v < grule_size; v++) {
     sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
   }
