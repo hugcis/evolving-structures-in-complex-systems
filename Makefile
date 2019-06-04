@@ -1,7 +1,7 @@
 CC=gcc
 LD=gcc
 CFLAGS=-I. -Wall -O3 -march=native -funroll-loops -ffast-math -flto=thin
-LDFLAGS=-I. -Wall -lz -O3 -flto=thin
+LDFLAGS=-I. -Wall -lz -O3 -flto=thin -framework Accelerate
 SOURCES:=$(wildcard src/*.c)
 OBJS:=$(SOURCES:src/%.c=build/%.o)
 TARGET:=bin/automaton

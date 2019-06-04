@@ -85,9 +85,9 @@ void init_automat(size_t size, uint8_t a[size][size], int states)
 }
 
 void update_step_general(uint64_t grule_size, size_t size,
-                         uint8_t base[size][size],
+                         uint8_t A[size][size],
                          uint8_t rule[grule_size],
-                         uint8_t** A, int states,
+                         uint8_t base[size][size], int states,
                          int horizon)
 {
   uint64_t position;
@@ -95,8 +95,6 @@ void update_step_general(uint64_t grule_size, size_t size,
   int increment;
 
   for (size_t i = 0; i < size; i++) {
-    memcpy(A[i], base[i], size * sizeof(uint8_t));
-
     for (size_t j = 0; j < size; j++) {
       position = 0;
       increment = 0;
@@ -111,15 +109,13 @@ void update_step_general(uint64_t grule_size, size_t size,
       A[i][j] = rule[position];
     }
   }
-  for (size_t i = 0; i < size; i++) {
-    memcpy(base[i], A[i], size * sizeof(uint8_t));
-  }
+  memcpy(base, A, size * size * sizeof(uint8_t));
 }
 
 void update_step_totalistic(uint64_t rule_size, size_t size,
                             uint8_t base[size][size],
                             uint8_t rule[rule_size],
-                            uint8_t** A, int states,
+                            uint8_t A[size][size], int states,
                             int horizon)
 {
   int count;
@@ -262,10 +258,11 @@ double predictive_score(map_t map, int states, size_t size,
       build_key_string(key_len, key, size, automaton, offset, i, j);
       error = hashmap_get(map, key, (void**)(&value));
       if (error==MAP_MISSING) {
-        result += 1/(double)states;
+        result += - log2(1/(double)states);
       }
       else {
-        result += value->number_array[automaton[i][j]];
+        result +=  - log2((value->number_array[automaton[i][j]] > PERT) ?
+                          value->number_array[automaton[i][j]]: PERT);
       }
     }
   }
@@ -287,10 +284,17 @@ int compute_cross_ent(any_t in_item, any_t in)
   data_struct_t* source;
   data_struct_t* target = (data_struct_t*) in;
   cross_ent_struct_t* item = (cross_ent_struct_t*) in_item;
+
+  /* Placeholder with uniform distribution over the states */
   double* base_array = calloc(item->states, sizeof(double));
+  for (int i = 0; i < item->states; ++i) {
+    base_array[i] = 1/(double)item->states;
+  }
+
   double* ph_array;
 
   error = hashmap_get(item->source_map, target->key_string, (void**)(&source));
+  /*  By default the prediction is same proability for all states */
   if (error==MAP_MISSING) {
     ph_array = base_array;
   }
@@ -372,6 +376,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   FILE* entrop_file = NULL;
   char* entrop_fname;
 
+  FILE* nn_file = NULL;
+  char* nn_fname;
+
   int last_compressed_size;
   int compressed_size;
   /* int agg_compressed_size; */
@@ -422,21 +429,15 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   map_t map50b = hashmap_new();
   map_t map5b = hashmap_new();
 
-  map_t map_a = hashmap_new();
-  map_t map_b = hashmap_new();
-
   int flag = 0;
 
   for (int i = 0; i < steps; i++) {
-    process_function(grule_size, size, A, rule, placeholder, states, horizon);
+
+    process_function(grule_size, size, base, rule, A, states, horizon);
 
     if (i % grain == 0) {
       last_compressed_size = compressed_size;
       last_cell_count = cell_count;
-
-      /* print_aggregated_bits(size, size, A, out_string, 2); */
-      /* agg_compressed_size = compress_memory_size(out_string,
-         (size/2 + 1) * size); */
 
       print_bits(size, size, A, out_string);
       compressed_size = compress_memory_size(out_string, (size + 1) * size);
@@ -494,6 +495,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       print_bits(size, size, A, out_string300);
       populate_map(map300, size, A, offset_a, states);
       populate_map(map300b, size, A, offset_b, states);
+
+      memcpy(automat300, A, size * size * sizeof(uint8_t));
     }
     if (i == steps - 200) {
       print_bits(size, size, A, out_string200);
@@ -505,6 +508,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       print_bits(size, size, A, out_string50);
       populate_map(map50, size, A, offset_a, states);
       populate_map(map50b, size, A, offset_b, states);
+
+      memcpy(automat50, A, size * size * sizeof(uint8_t));
     }
     if (i == steps - 10) {
       print_bits(size, size, A, out_string10);
@@ -513,6 +518,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       print_bits(size, size, A, out_string5);
       populate_map(map5, size, A, offset_a, states);
       populate_map(map5b, size, A, offset_b, states);
+
+      memcpy(automat5, A, size * size * sizeof(uint8_t));
     }
     if (i == steps - 1) {
       print_bits(size, size, A, out_string);
@@ -559,28 +566,28 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
       entrop_file = fopen(entrop_fname, "w+");
 
-      populate_map(map_a, size, A, offset_a, states);
-      populate_map(map_b, size, A, offset_b, states);
-
-      add_results_to_file(map300, map_a, states, entrop_file);
-      add_results_to_file(map50, map_a, states, entrop_file);
-      add_results_to_file(map5, map_a, states, entrop_file);
+      add_results_to_file(map300, size, A, states, offset_a, entrop_file);
+      add_results_to_file(map50, size, A, states, offset_a, entrop_file);
+      add_results_to_file(map5, size, A, states, offset_a, entrop_file);
       fprintf(entrop_file, "\n");
 
 
-      add_results_to_file(map300b, map_b, states, entrop_file);
-      add_results_to_file(map50b, map_b, states, entrop_file);
-      add_results_to_file(map5b, map_b, states, entrop_file);
+      add_results_to_file(map300b, size, A, states, offset_b, entrop_file);
+      add_results_to_file(map50b, size, A, states, offset_b, entrop_file);
+      add_results_to_file(map5b, size, A, states, offset_b, entrop_file);
       fprintf(entrop_file, "\n");
+
+
+      asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf);
+      nn_file = fopen(nn_fname, "w+");
+      train_nn_on_automaton(size, states, automat300, A, 7, nn_file);
+      train_nn_on_automaton(size, states, automat50, A, 7, nn_file);
+      train_nn_on_automaton(size, states, automat5, A, 7, nn_file);
     }
   }
   printf("\n");
 
   /* Cleanup before finishing */
-  for (size_t i = 0; i < size; i++) {
-    free(placeholder[i]);
-  }
-  free(placeholder);
 
   free_map(map5);
   free_map(map300);
@@ -589,8 +596,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   free_map(map300b);
   free_map(map50b);
 
-  free_map(map_a);
-  free_map(map_b);
+  free(automat5);
+  free(automat50);
+  free(automat300);
 
   free(fname);
   free(mult_time_fname);
@@ -598,6 +606,10 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   if (entrop_file) {
     free(entrop_fname);
     fclose(entrop_file);
+  }
+  if (nn_file) {
+    free(nn_fname);
+    fclose(nn_file);
   }
   fclose(mult_time_file);
   fclose(out_file);
