@@ -175,6 +175,7 @@ int main_1d(int argc, char** argv)
   struct Options1D options;
   options.init = ONE;
   options.timesteps = 256;
+  options.grain = 50;
   options.write = NO_WRITE;
 
   char usage[] = "%s 1d [-s size] [-t timesteps]"
@@ -184,7 +185,7 @@ int main_1d(int argc, char** argv)
                         " Must be one of \"one\", \"random\","
                         " \"random_small\"\n";
 
-  while ((c = getopt(argc - 1, &argv[1], "s:t:n:w:i:o")) != -1)
+  while ((c = getopt(argc - 1, &argv[1], "s:t:n:w:i:og:")) != -1)
     switch (c) {
     case 's':
       size = atol(optarg);
@@ -216,6 +217,9 @@ int main_1d(int argc, char** argv)
         exit(1);
       }
       break;
+    case 'g':
+      options.grain = atoi(optarg);
+      break;
     case '?':
       err = 1;
       break;
@@ -231,7 +235,6 @@ int main_1d(int argc, char** argv)
 
   time_t t;
   srand((unsigned)time(&t));
-  fprintf(stderr, "%"PRIu64, (uint64_t)pow(states, rule_size));
   for (uint64_t n = 0; n < (uint64_t)pow(states, rule_size); n++) {
     for (size_t i = 0; i < rule_size; ++i) {
       rule[i] = (uint8_t)((n / ipow(states, i)) % states);

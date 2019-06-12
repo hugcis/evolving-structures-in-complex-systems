@@ -16,6 +16,7 @@ struct Options1D {
   enum InitMode init;
   size_t timesteps;
   enum WriteMode write;
+  int grain;
 };
 
 void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],

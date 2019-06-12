@@ -5,12 +5,16 @@
 #include <string.h>
 #include <time.h>
 #include <inttypes.h>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_rng.h>
 #include "2d_automaton.h"
 #include "nn.h"
 #include "compress.h"
 #include "utils.h"
 #include "hashmap.h"
 
+#define DIRICHLET 1
+#define D_CONST 0.5
 #define KEY_MAX_LENGTH (256)
 #define PERT 1E-15
 
@@ -141,7 +145,6 @@ void update_step_totalistic(uint64_t rule_size, size_t size,
 
 int count_cells(size_t size, uint8_t A[size][size], int states)
 {
-  assert(A && size);
   int* counts = (int*)calloc(states, sizeof(int));
   for (size_t i = 0; i < size; ++i) {
     for (size_t j = 0; j < size; ++j) {
@@ -468,7 +471,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                     (compressed_size / (float)cell_count) ) /
             (dbl_comp_size / (float)(last_cell_count + cell_count));
         }
-        fprintf(out_file, "%i    %i    %f    %f"
+        fprintf(out_file, "%i    %i    %f    %f    "
                           "%i    %i    %i\n",
                 i, compressed_size, ratio, ratio2, cell_count, last_cell_count,
                 dbl_comp_size);
@@ -491,7 +494,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       }
     }
 
-    if (i == steps - 300) {
+    if (i == steps - 301) {
       print_bits(size, size, A, out_string300);
       populate_map(map300, size, A, offset_a, states);
       populate_map(map300b, size, A, offset_b, states);
@@ -504,7 +507,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     if (i == steps - 100) {
       print_bits(size, size, A, out_string100);
     }
-    if (i == steps - 50) {
+    if (i == steps - 51) {
       print_bits(size, size, A, out_string50);
       populate_map(map50, size, A, offset_a, states);
       populate_map(map50b, size, A, offset_b, states);
@@ -755,6 +758,17 @@ void build_rule_from_args(uint64_t grule_size,
 }
 
 /**
+ * Simple double comparison function used for sorting in the rule generation
+ * function.
+ */
+int comp (const void * elem1, const void * elem2)
+{
+  float f = *((float*)elem1);
+  float s = *((float*)elem2);
+  return (f > s) - (f < s);
+}
+
+/**
  * Generate a random general rule. The rule is written to rule_array and a
  * string  representation is also saved in rule_buf.
  */
@@ -764,21 +778,51 @@ void generate_general_rule(uint64_t grule_size,
                            int states, int horizon)
 {
   int inc;
-  /* The following implements a Uniform-lambda sampling strategy */
 
   /* Choose lambda parameter at random as well as the proportion of */
-  /* transitions to other states*/
-  float lambda[states - 1];
-  for (int i = 0; i < states - 1; ++i) {
-    lambda[i] = ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+  /* transitions to other states */
+
+  double alphas[states];
+  double theta[states], lambda[states - 1], rand_num;
+
+  /* This method samples the transition probability simplex according to a */
+  /* Dirichlet distribution with parameter D_CONST */
+  if (DIRICHLET == 1) {
+    const gsl_rng_type * T;
+
+    gsl_rng * r;
+    gsl_rng_env_setup();
+
+    T = gsl_rng_default;
+    r = gsl_rng_alloc (T);
+    time_t t;
+    gsl_rng_set(r, (unsigned long)time(&t));
+
+    for (int i = 0; i < states; ++i) {
+      alphas[i] = D_CONST;
+    }
+    gsl_ran_dirichlet(r, states, alphas, theta);
+    lambda[0] = theta[0];
+    for (int i = 1; i < states - 1; ++i) {
+      lambda[i] = theta[i] + lambda[i - 1];
+    }
+
+    gsl_rng_free(r);
+  }
+  /* Second method that samples the simplex uniformly */
+  else {
+    for (int i = 0; i < states - 1; ++i) {
+      lambda[i] = ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+    }
+    qsort(lambda, sizeof(lambda)/sizeof(*lambda), sizeof(*lambda), comp);
   }
 
   for (uint64_t v = 0; v < grule_size; v++) {
-    inc = 0;
     /* Assign the rule to the first state that passes the test */
-    while ((double)rand() / (double)((unsigned)RAND_MAX + 1) > lambda[inc]
-           && inc < states - 1) {
-      inc++;
+    rand_num = (double)rand() / (double)((unsigned)RAND_MAX + 1);
+    inc = 0;
+    while (lambda[inc] < rand_num && inc < states - 1) {
+      ++inc;
     }
     rule_array[v] = (uint8_t)inc;
   }

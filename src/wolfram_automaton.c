@@ -8,7 +8,6 @@
 #include "compress.h"
 #include "utils.h"
 
-#define GRAIN 50
 #define NEIGHBORS 3
 
 
@@ -117,16 +116,27 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
            rule_number(states, rule_size, rule));
   out_steps_file = fopen(out_steps_fname, "w+");
 
+  char* spaced_output;
+  char* final_output;
+  char* dbl_ouput = (char*) malloc(( 2 * size + 1 ) * sizeof(char));
+
   uint8_t A[size];
+  uint8_t final[size];
   init_automat(states, size, A, options->init);
+  memcpy(final, A, size * sizeof(uint8_t));
+
   size_t v;
-  int comp_size = 0;
+  int comp_size = 0, dbl_comp_size = 0;
+
+  for (v = 0; v < steps; ++v) {
+    update_step(size, rule_size, final, rule, states);
+  }
+  final_output = print_bits_spaced(size, A);
 
   for (v = 0; v < steps; ++v) {
 
-    char* spaced_output = print_bits_spaced(size, A);
+    spaced_output = print_bits_spaced(size, A);
     fprintf(out_steps_file, "%s\n", spaced_output);
-    free(spaced_output);
 
     if (print_automaton == 1) {
       printf("%s\n", print_bits_spaced(size, A));
@@ -134,21 +144,23 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
 
     update_step(size, rule_size, A, rule, states);
 
-    if (v % GRAIN == 0) {
-      char* output_string = print_bits_spaced(size, A);
-      comp_size = compress_memory_size(output_string, size);
+    if (v % options->grain == 0) {
+      comp_size = compress_memory_size(spaced_output, size);
 
-      fprintf(out_file, "%lu    %i    %lu\n", v, comp_size,
-              rule_number(states, rule_size, rule));
-      free(output_string);
+      fprintf(out_file, "%lu    %i    %i\n", v, comp_size,
+              dbl_comp_size);
+      sprintf(dbl_ouput, "%s%s", spaced_output, final_output);
+      dbl_comp_size = compress_memory_size(dbl_ouput, 2 * size);
 
       if (options->write == WRITE_STEP) {
         write_step(size, rule_size, A, rule, v, states);
       }
     }
+    free(spaced_output);
 
   }
-  printf("%i", comp_size);
+  printf("%i\t%i", comp_size, dbl_comp_size);
+  free(final_output);
   fclose(out_file);
   fclose(out_steps_file);
 }
