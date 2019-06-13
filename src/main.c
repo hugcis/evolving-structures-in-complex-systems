@@ -25,9 +25,10 @@ int main_2d(int argc, char** argv)
   size_t size = 256;
   char* input_rule;
   char* input_fname = NULL;
+  enum WriteStepMode save_step = STEP_FILE;
 
   /* Optional arguments processing */
-  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:")) != -1)
+  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:m")) != -1)
     switch (c) {
     case 'n':
       states = atoi(optarg);
@@ -64,6 +65,9 @@ int main_2d(int argc, char** argv)
       break;
     case 'z':
       n_simulations = atoi(optarg);
+      break;
+    case 'm':
+      save_step = TMP_FILE;
       break;
     case '?':
       err = 1;
@@ -134,7 +138,7 @@ int main_2d(int argc, char** argv)
     printf("Rule %s\n", rule_buf);
 
     process_rule(grule_size, rule_array, rule_buf,
-                 1, 1, 0, timesteps, states, horizon, size, grain);
+                 1, 1, 0, timesteps, states, horizon, size, grain, save_step);
     free(rule_array);
     free(rule_buf);
     return 0;
@@ -157,7 +161,7 @@ int main_2d(int argc, char** argv)
     fflush(stdout);
 
     process_rule(grule_size, rule_array, rule_buf,
-                 0, 1, 0, timesteps, states, horizon, size, grain);
+                 0, 1, 0, timesteps, states, horizon, size, grain, save_step);
   }
   printf("\n");
   free(rule_array);

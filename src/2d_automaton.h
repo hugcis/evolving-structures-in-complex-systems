@@ -5,6 +5,8 @@
 #ifndef TWOD_AUTOMATON_H /* Include guard */
 #define TWOD_AUTOMATON_H
 
+enum WriteStepMode { TMP_FILE, STEP_FILE };
+
 unsigned long hash(char*);
 
 void build_rule_from_args(uint64_t grule_size,
@@ -19,7 +21,7 @@ void process_rule(uint64_t grule_size,
                   uint8_t rule[grule_size],
                   char rule_buf[], int, int,
                   int, long, int, int, size_t,
-                  int);
+                  int, enum WriteStepMode);
 
 void update_step_general(uint64_t grule_size, size_t size,
                          uint8_t [size][size],

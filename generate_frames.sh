@@ -6,9 +6,24 @@
 #       python script.
 
 if [ -z $2 ];
-   then STATES=3;
+then STATES=3;
 else STATES=$2;
 fi
-./bin/automaton 2d -n $STATES -f "data_2d_$STATES/map/$1.map" || { echo 'Map file not found'; exit 1; }
-python plot_2d.py $1 $STATES
-open rule_gif/tmp.gif
+
+
+./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$1.map" ||
+    { echo 'Map file not found'; exit 1; }
+i=0;
+for fname in `ls rule_gif/*.step | sort -V`; do
+    ./test $fname 256 $i;
+    pamtogif rule_gif/tmp_$(printf "%05d" $i).ppm > rule_gif/tmp_$(printf "%05d" $i).gif &&
+    i=$((i+1));
+done;
+
+gifsicle `ls -v rule_gif/tmp*.gif` > rule_gif/temp.gif
+
+rm rule_gif/tmp_*.step
+rm rule_gif/tmp_*.ppm
+rm rule_gif/tmp_*.gif
+
+open rule_gif/temp.gif

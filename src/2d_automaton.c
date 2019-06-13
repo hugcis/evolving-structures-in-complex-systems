@@ -368,7 +368,7 @@ void add_results_to_file(map_t map_source, size_t size,
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[], int save_steps, int joint_complexity,
                   int totalistic, long steps, int states, int horizon,
-                  size_t size, int grain)
+                  size_t size, int grain, enum WriteStepMode save_flag)
 {
   FILE* out_file = NULL;
   char* fname;
@@ -485,8 +485,13 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       if (save_steps == 1) {
         FILE* out_step_file;
         char* step_fname;
-        asprintf(&step_fname, "step_2d_%i/out%s_%i.step",
-                 states, rule_buf, i);
+        if (save_flag == TMP_FILE) {
+          asprintf(&step_fname, "rule_gif/tmp_%i.step", i);
+        }
+        else {
+          asprintf(&step_fname, "step_2d_%i/out%s_%i.step",
+                   states, rule_buf, i);
+        }
         out_step_file = fopen(step_fname, "w+");
         free(step_fname);
         fprintf(out_step_file, "%s", out_string);
