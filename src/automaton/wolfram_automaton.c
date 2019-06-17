@@ -5,8 +5,8 @@
 #include <math.h>
 #include <inttypes.h>
 #include "wolfram_automaton.h"
-#include "compress.h"
-#include "utils.h"
+#include "utils/compress.h"
+#include "utils/utils.h"
 
 #define NEIGHBORS 3
 
@@ -24,7 +24,7 @@ char* print_bits_spaced(int bits_to_read, uint8_t a[bits_to_read])
 
 
 void update_step(size_t size, size_t rule_size, uint8_t base[size],
-                 uint8_t rule[rule_size], int states)
+                 uint8_t rule[rule_size], int states, int radius)
 {
   uint8_t* A = (uint8_t*)malloc(size * sizeof(uint8_t));
 
@@ -32,14 +32,10 @@ void update_step(size_t size, size_t rule_size, uint8_t base[size],
 
   for (size_t r = 0; r < size; r++) {
     int c = 0;
-    if (base[(r - 1 + size) % size] == 1) {
-      c += ipow(states, 2);
-    }
-    if (base[r] == 1) {
-      c += ipow(states, 1);
-    }
-    if (base[(r + 1) % size] == 1) {
-      c += ipow(states, 0);
+    for (int w = -radius; w <= radius; w++) {
+      if (base[(r + w + size) % size] == 1) {
+        c += ipow(states, 2 * radius - (w + radius));
+      }
     }
     A[r] = rule[c];
   }
@@ -57,14 +53,10 @@ static void init_automat(int states, size_t size, uint8_t a[size],
     return;
   }
   if (mode == RANDOM) {
-    time_t t;
-    srand((unsigned)time(&t));
     for (size_t i = 0; i < size; i++) {
       a[i] = rand() % states;
     }
   } else if (mode == RAND_SMALL) {
-    time_t t;
-    srand((unsigned)time(&t));
     for (size_t i = 1; i < size / 5; i++) {
       a[i] = rand() % states;
     }
@@ -129,7 +121,7 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
   int comp_size = 0, dbl_comp_size = 0;
 
   for (v = 0; v < steps; ++v) {
-    update_step(size, rule_size, final, rule, states);
+    update_step(size, rule_size, final, rule, states, options->radius);
   }
   final_output = print_bits_spaced(size, A);
 
@@ -142,7 +134,7 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
       printf("%s\n", print_bits_spaced(size, A));
     }
 
-    update_step(size, rule_size, A, rule, states);
+    update_step(size, rule_size, A, rule, states, options->radius);
 
     if (v % options->grain == 0) {
       comp_size = compress_memory_size(spaced_output, size);

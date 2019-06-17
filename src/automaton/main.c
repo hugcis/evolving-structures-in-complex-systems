@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include "2d_automaton.h"
 #include "wolfram_automaton.h"
-#include "utils.h"
+#include "utils/utils.h"
 
 const char help[] = "Use with either 2d or 1d as first argument";
 
@@ -174,13 +174,14 @@ int main_1d(int argc, char** argv)
   extern char *optarg;
   extern int optind;
   int c, err = 0;
-  size_t size = 256, neighbor = 3;
+  size_t size = 256;
   int states = 2;
   struct Options1D options;
   options.init = ONE;
   options.timesteps = 256;
   options.grain = 50;
   options.write = NO_WRITE;
+  options.radius = 1;
 
   char usage[] = "%s 1d [-s size] [-t timesteps]"
                  "[-n n_states] [-w neighborhood width]"
@@ -189,7 +190,7 @@ int main_1d(int argc, char** argv)
                         " Must be one of \"one\", \"random\","
                         " \"random_small\"\n";
 
-  while ((c = getopt(argc - 1, &argv[1], "s:t:n:w:i:og:")) != -1)
+  while ((c = getopt(argc - 1, &argv[1], "s:t:n:r:i:og:")) != -1)
     switch (c) {
     case 's':
       size = atol(optarg);
@@ -200,8 +201,8 @@ int main_1d(int argc, char** argv)
     case 'n':
       states = atoi(optarg);
       break;
-    case 'w':
-      neighbor = atoi(optarg);
+    case 'r':
+      options.radius = atoi(optarg);
       break;
     case 'o':
       options.write = WRITE_STEP;
@@ -234,20 +235,30 @@ int main_1d(int argc, char** argv)
     exit(1);
   }
 
-  size_t rule_size = (int)pow(states, neighbor);
-  uint8_t rule[rule_size];
+  size_t rule_size = (int)pow(states, 2 * options.radius + 1);
+  uint8_t* rule = (uint8_t *)malloc(sizeof(uint8_t) * rule_size);
 
   time_t t;
   srand((unsigned)time(&t));
-  for (uint64_t n = 0; n < (uint64_t)pow(states, rule_size); n++) {
+
+  uint64_t maxi = ((uint64_t)ipow(states, rule_size) > 300) ? 300:
+    (uint64_t)pow(states, rule_size);
+
+  for (uint64_t n = 0; n < maxi; n++) {
     for (size_t i = 0; i < rule_size; ++i) {
-      rule[i] = (uint8_t)((n / ipow(states, i)) % states);
+      if (maxi == 300) {
+        rule[i] = (uint8_t)(rand() % states);
+      }
+      else {
+        rule[i] = (uint8_t)((n / ipow(states, i)) % states);
+      }
     }
     printf("%lu\t", rule_number(states, rule_size, rule));
     write_to_file(size, rule_size, rule, 0, &options, states);
     printf("\n");
   }
 
+  free(rule);
   return 0;
 }
 

@@ -17,6 +17,7 @@ struct Options1D {
   size_t timesteps;
   enum WriteMode write;
   int grain;
+  int radius;
 };
 
 void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],

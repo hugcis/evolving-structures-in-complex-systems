@@ -1,7 +1,10 @@
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
+
 CC=gcc
 LD=gcc
-CFLAGS=-I. -Wall -O3 -march=native -funroll-loops -ffast-math -flto=thin
-LDFLAGS=-I. -Wall -lz -O3 -flto=thin -framework Accelerate -lgsl
+CFLAGS=-Isrc -Wall -O3 -march=native -funroll-loops -ffast-math -flto=thin
+LDFLAGS=-Isrc -Wall -lz -O3 -flto=thin -framework Accelerate -lgsl
 SRCDIR:=src
 BUILDDIR:=build
 BINDIR:=bin
@@ -10,7 +13,7 @@ MKDIR:=@mkdir -p
 SOURCES:=$(shell find $(SRCDIR) -type f -name "*.$(SRCEXT)")
 OBJS:=$(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.o))
 
-DIRS:= automaton
+DIRS:= automaton utils nn
 SOURCEDIRS:=$(foreach dir, $(DIRS), $(addprefix $(SRCEDIR)/, $(dir)))
 TARGETDIRS:=$(foreach dir, $(DIRS), $(addprefix $(BUILDDIR)/, $(dir)))
 

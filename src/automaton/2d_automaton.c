@@ -8,10 +8,10 @@
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_rng.h>
 #include "2d_automaton.h"
-#include "nn.h"
-#include "compress.h"
-#include "utils.h"
-#include "hashmap.h"
+#include "nn/nn.h"
+#include "utils/compress.h"
+#include "utils/utils.h"
+#include "utils/hashmap.h"
 
 #define DIRICHLET 1
 #define D_CONST 0.5
