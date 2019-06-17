@@ -423,7 +423,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   char out_string50[(size + 1) * size + 1];
   char out_string10[(size + 1) * size + 1];
   char out_string5[(size + 1) * size + 1];
-  int dbl_cmp300, dbl_cmp200, dbl_cmp100, dbl_cmp50, dbl_cmp10, dbl_cmp5;
+  /* int dbl_cmp300, dbl_cmp200, dbl_cmp100, dbl_cmp50, dbl_cmp10, dbl_cmp5; */
 
   map_t map300 = hashmap_new();
   map_t map50 = hashmap_new();
@@ -530,46 +530,46 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       memcpy(automat5, A, size * size * sizeof(uint8_t));
     }
     if (i == steps - 1) {
-      print_bits(size, size, A, out_string);
-      memcpy(&dbl_pholder[(size + 1) * size + 1],
-             out_string, (size + 1) * size + 1);
+      /* print_bits(size, size, A, out_string); */
+      /* memcpy(&dbl_pholder[(size + 1) * size + 1], */
+      /*        out_string, (size + 1) * size + 1); */
 
-      memcpy(dbl_pholder, out_string300, (size + 1) * size + 1);
-      dbl_cmp300 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string200, (size + 1) * size + 1);
-      dbl_cmp200 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string100, (size + 1) * size + 1);
-      dbl_cmp100 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string50, (size + 1) * size + 1);
-      dbl_cmp50 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string10, (size + 1) * size + 1);
-      dbl_cmp10 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string5, (size + 1) * size + 1);
-      dbl_cmp5 = compress_memory_size(dbl_pholder,
-                                       2 * ((size + 1) * size + 1));
+      /* memcpy(dbl_pholder, out_string300, (size + 1) * size + 1); */
+      /* dbl_cmp300 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string200, (size + 1) * size + 1); */
+      /* dbl_cmp200 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string100, (size + 1) * size + 1); */
+      /* dbl_cmp100 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string50, (size + 1) * size + 1); */
+      /* dbl_cmp50 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string10, (size + 1) * size + 1); */
+      /* dbl_cmp10 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string5, (size + 1) * size + 1); */
+      /* dbl_cmp5 = compress_memory_size(dbl_pholder, */
+      /*                                  2 * ((size + 1) * size + 1)); */
 
-      fprintf(mult_time_file, "%i    %i    %i    %i    "
-                              "%i    %i    %i    %i    "
-                              "%i    %i    %i    %i    "
-                              "%i\n",
-              compress_memory_size(out_string, (size + 1) * size),
-              dbl_cmp5,
-              compress_memory_size(out_string5, (size + 1) * size),
-              dbl_cmp10,
-              compress_memory_size(out_string10, (size + 1) * size),
-              dbl_cmp50,
-              compress_memory_size(out_string50, (size + 1) * size),
-              dbl_cmp100,
-              compress_memory_size(out_string100, (size + 1) * size),
-              dbl_cmp200,
-              compress_memory_size(out_string200, (size + 1) * size),
-              dbl_cmp300,
-              compress_memory_size(out_string300, (size + 1) * size));
+      /* fprintf(mult_time_file, "%i    %i    %i    %i    " */
+      /*                         "%i    %i    %i    %i    " */
+      /*                         "%i    %i    %i    %i    " */
+      /*                         "%i\n", */
+      /*         compress_memory_size(out_string, (size + 1) * size), */
+      /*         dbl_cmp5, */
+      /*         compress_memory_size(out_string5, (size + 1) * size), */
+      /*         dbl_cmp10, */
+      /*         compress_memory_size(out_string10, (size + 1) * size), */
+      /*         dbl_cmp50, */
+      /*         compress_memory_size(out_string50, (size + 1) * size), */
+      /*         dbl_cmp100, */
+      /*         compress_memory_size(out_string100, (size + 1) * size), */
+      /*         dbl_cmp200, */
+      /*         compress_memory_size(out_string200, (size + 1) * size), */
+      /*         dbl_cmp300, */
+      /*         compress_memory_size(out_string300, (size + 1) * size)); */
 
       asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
       entrop_file = fopen(entrop_fname, "w+");
