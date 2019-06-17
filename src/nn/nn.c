@@ -11,25 +11,25 @@
 #define NUMHID 10
 #define MAX_EPOCH 10
 
+/**
+ * A function for generating random numbers according to a N(mu, sigma) Gaussian
+ * distribution.
+ */
 double randn (double mu, double sigma)
 {
   double U1, U2, W, mult;
   static double X1, X2;
   static int call = 0;
 
-  if (call == 1)
-    {
+  if (call == 1) {
       call = !call;
       return (mu + sigma * (double) X2);
-    }
-
-  do
-    {
+  }
+  do {
       U1 = -1 + ((double) rand () / RAND_MAX) * 2;
       U2 = -1 + ((double) rand () / RAND_MAX) * 2;
       W = pow (U1, 2) + pow (U2, 2);
-    }
-  while (W >= 1 || W == 0);
+  } while (W >= 1 || W == 0);
 
   mult = sqrt ((-2 * log (W)) / W);
   X1 = U1 * mult;
@@ -40,11 +40,18 @@ double randn (double mu, double sigma)
   return (mu + sigma * (double) X1);
 }
 
+/**
+ * Shorthand to generate normally distributed random numbers.
+ */
 double rand_normal()
 {
   return randn(0.0, 1.0);
 }
 
+/**
+ * This function fills the input and target vector with the list of training
+ * examples from automaton.
+ */
 void fill_input_target(size_t size, double* input, uint8_t* target,
                        uint8_t automaton[size][size], int offset)
 {
