@@ -11,19 +11,26 @@ else STATES=$2;
 fi
 
 
-./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$1.map" ||
+if [ -z $3 ];
+then TIME=1000;
+else TIME=$3;
+fi
+
+
+./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$1.map" -t $TIME ||
     { echo 'Map file not found'; exit 1; }
+
 i=0;
 for fname in `ls rule_gif/*.step | sort -V`; do
-    ./test $fname 256 $i;
-    pamtogif rule_gif/tmp_$(printf "%05d" $i).ppm > rule_gif/tmp_$(printf "%05d" $i).gif &&
-    i=$((i+1));
+    ./step_to_ppm $fname 256 $STATES \
+        | pamtogif > rule_gif/tmp_$(printf "%05d" $i).gif \
+        && i=$((i+1));
 done;
 
-gifsicle `ls -v rule_gif/tmp*.gif` > rule_gif/temp.gif
+gifsicle -d 30 --loop `ls -v rule_gif/tmp*.gif` --resize 500x500  \
+         > rule_gif/temp.gif
 
 rm rule_gif/tmp_*.step
-rm rule_gif/tmp_*.ppm
 rm rule_gif/tmp_*.gif
 
 open rule_gif/temp.gif

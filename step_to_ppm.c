@@ -7,10 +7,12 @@
 #include <string.h>
 #include <netpbm/pam.h>
 
-const int palette_rgb[12][3] = {
+const int palette_rgb[14][3] = {
                                 {255, 255, 255},
                                 {0, 0, 0},
-                                {173, 35, 35},
+                                {255, 0, 0},
+                                {0, 255, 0},
+                                {0, 0, 255},
                                 {42, 75, 215},
                                 {29, 105, 20},
                                 {129, 74, 25},
@@ -25,6 +27,7 @@ int main(int argc, const char** argv)
 {
   struct pam outpam;
   int size = atoi(argv[2]);
+  int states = atoi(argv[3]);
   int row, c;
   FILE* input = fopen(argv[1], "r");
   uint8_t automaton[size * size];
@@ -36,10 +39,6 @@ int main(int argc, const char** argv)
     }
   }
 
-  char outname[100];
-  sprintf(outname, "rule_gif/tmp_%05d.ppm", atoi(argv[3]));
-  FILE* f = pm_openw(outname);
-
   pm_proginit(&argc, argv);
 
   outpam.size = 10000;
@@ -49,10 +48,11 @@ int main(int argc, const char** argv)
   outpam.format = PAM_FORMAT;
   outpam.height = size;
   outpam.width = size;
-  outpam.file = f;
+  outpam.file = stdout;
   outpam.depth = 3;
 
   tuple** arr = pnm_allocpamarray(&outpam);
+  int color_offset = states == 2 ? 0 : 2;
 
   for (row = 0; row < outpam.height; ++row) {
     int column;
@@ -60,9 +60,11 @@ int main(int argc, const char** argv)
       unsigned int depth;
       for (depth = 0; depth < outpam.depth; ++depth) {
         arr[row][column][depth] =
-          palette_rgb[automaton[row * size + column]][depth];
+          palette_rgb[automaton[row * size + column] +
+                      color_offset][depth];
       }
     }
   }
   pnm_writepam(&outpam, arr);
+  pnm_freepamarray(arr, &outpam);
 }
