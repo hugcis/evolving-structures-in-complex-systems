@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include "2d_automaton.h"
+#include "rule.h"
 #include "wolfram_automaton.h"
 #include "utils/utils.h"
 

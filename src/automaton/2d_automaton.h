@@ -9,13 +9,6 @@ enum WriteStepMode { TMP_FILE, STEP_FILE };
 
 unsigned long hash(char*);
 
-void build_rule_from_args(uint64_t grule_size,
-                          uint8_t rule_array[grule_size],
-                          char rule_buf[grule_size + 1],
-                          char*, int);
-
-void symmetrize_rule(uint64_t grule_size,
-                     uint8_t rule_array[grule_size], int, int);
 
 void process_rule(uint64_t grule_size,
                   uint8_t rule[grule_size],

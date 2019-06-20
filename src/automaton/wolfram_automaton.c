@@ -57,7 +57,7 @@ static void init_automat(int states, size_t size, uint8_t a[size],
       a[i] = rand() % states;
     }
   } else if (mode == RAND_SMALL) {
-    for (size_t i = 1; i < size / 5; i++) {
+    for (size_t i = size / 2 - size / 5; i < size / 2 + size / 5; i++) {
       a[i] = rand() % states;
     }
   }
@@ -118,12 +118,13 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
   memcpy(final, A, size * sizeof(uint8_t));
 
   size_t v;
-  int comp_size = 0, dbl_comp_size = 0;
+  int end_comp_size = 0, comp_size = 0, dbl_comp_size = 0;
 
   for (v = 0; v < steps; ++v) {
     update_step(size, rule_size, final, rule, states, options->radius);
   }
-  final_output = print_bits_spaced(size, A);
+  final_output = print_bits_spaced(size, final);
+  end_comp_size = compress_memory_size(final_output, size);
 
   for (v = 0; v < steps; ++v) {
 
@@ -147,11 +148,15 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
       if (options->write == WRITE_STEP) {
         write_step(size, rule_size, A, rule, v, states);
       }
+
+      if (v == options->grain) {
+        printf("%i\t", comp_size);
+      }
     }
     free(spaced_output);
 
   }
-  printf("%i\t%i", comp_size, dbl_comp_size);
+  printf("%i\t%i\t%i", end_comp_size, comp_size, dbl_comp_size);
   free(final_output);
   fclose(out_file);
   fclose(out_steps_file);
