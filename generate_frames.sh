@@ -26,8 +26,7 @@ for fname in `ls rule_gif/*.step | sort -V`; do
         | pamtogif > rule_gif/tmp_$(printf "%05d" $i).gif \
         && i=$((i+1));
 done;
-
-gifsicle -d 30 --loop `ls -v rule_gif/tmp*.gif` --resize 500x500  \
+gifsicle -d 30 --loop `ls -v rule_gif/tmp*.gif` --scale 2 \
          > rule_gif/temp.gif
 
 rm rule_gif/tmp_*.step
