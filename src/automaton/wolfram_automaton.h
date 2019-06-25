@@ -13,11 +13,11 @@ enum WriteMode {
 };
 
 struct Options1D {
-  enum InitMode init;
-  size_t timesteps;
-  enum WriteMode write;
-  int grain;
-  int radius;
+  enum InitMode init; /**< Initialiation parameter */
+  size_t timesteps; /**< Number of timesteps for the automaton */
+  enum WriteMode write; /**< Wether to write output or not to stdin */
+  int grain; /**< Granularity of the compression */
+  int radius; /**< Radius of the rule window */
 };
 
 void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],

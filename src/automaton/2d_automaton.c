@@ -67,6 +67,9 @@ void print_bits(size_t dim1, size_t dim2, uint8_t a[dim1][dim2], char* buf)
   buf[(dim1 + 1) * dim2] = '\0';
 }
 
+/**
+ * @brief Automaton initializer function.
+ */
 void init_automat(size_t size, uint8_t a[size][size], int states)
 {
   assert(size > 20);
@@ -84,6 +87,7 @@ void init_automat(size_t size, uint8_t a[size][size], int states)
     }
   }
 }
+
 
 void update_step_general(uint64_t grule_size, size_t size,
                          uint8_t A[size][size],
@@ -359,14 +363,14 @@ void add_results_to_file(map_t map_source, size_t size,
 }
 
 
-/**
- * Given a rule, create and simulate the corresponding automaton.
- */
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
-                  char rule_buf[], int save_steps, int joint_complexity,
-                  int totalistic, long steps, int states, int horizon,
-                  size_t size, int grain, enum WriteStepMode save_flag)
+                  char rule_buf[],
+                  int totalistic, long steps,
+                  struct Options2D* opts, results_nn_t* results)
 {
+  int states = opts->states;
+  size_t size = opts->size;
+
   FILE* out_file = NULL;
   char* fname;
 
@@ -433,9 +437,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
   for (int i = 0; i < steps; i++) {
 
-    process_function(grule_size, size, base, rule, A, states, horizon);
+    process_function(grule_size, size, base, rule, A, states, opts->horizon);
 
-    if (i % grain == 0) {
+    if (i % opts->grain == 0) {
       last_compressed_size = compressed_size;
       last_cell_count = cell_count;
 
@@ -443,16 +447,17 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       compressed_size = compress_memory_size(out_string, (size + 1) * size);
       cell_count = count_cells(size, A, states);
 
-      /* Check if state has evolved from last time */
-      if (compressed_size == last_compressed_size && flag == 1) {
+      /* Check if state has evolved from last time (stop mechanism)*/
+      if (compressed_size == last_compressed_size
+          && flag == 1 && opts->early == EARLY) {
         printf("\n");
-        /* Cleanup before returning */
         break;
-      } else if (compressed_size == last_compressed_size) {
+      }
+      else if (compressed_size == last_compressed_size) {
         flag = 1;
       }
 
-      if (joint_complexity == 1) {
+      if (opts->joint_complexity == 1) {
         memcpy(&dbl_pholder[(size + 1) * size + 1],
                out_string, (size + 1) * size + 1);
 
@@ -479,21 +484,28 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       printf("%i  ", compressed_size);
       fflush(stdout);
 
-      if (save_steps == 1) {
-        FILE* out_step_file;
-        char* step_fname;
-        if (save_flag == TMP_FILE) {
-          asprintf(&step_fname, "rule_gif/tmp_%i.step", i);
-        }
-        else {
-          asprintf(&step_fname, "step_2d_%i/out%s_%i.step",
-                   states, rule_buf, i);
-        }
-        out_step_file = fopen(step_fname, "w+");
-        free(step_fname);
-        fprintf(out_step_file, "%s", out_string);
-        fclose(out_step_file);
+    }
+
+    /* Save steps every grain_write */
+    if (opts->grain_write > 0
+        && i % opts->grain_write == 0
+        && opts->save_steps == 1) {
+
+      FILE* out_step_file;
+      char* step_fname;
+
+      print_bits(size, size, A, out_string);
+      if (opts->save_flag == TMP_FILE) {
+        asprintf(&step_fname, "rule_gif/tmp_%i.step", i);
       }
+      else {
+        asprintf(&step_fname, "step_2d_%i/out%s_%i.step",
+                 states, rule_buf, i);
+      }
+      out_step_file = fopen(step_fname, "w+");
+      free(step_fname);
+      fprintf(out_step_file, "%s", out_string);
+      fclose(out_step_file);
     }
 
     if (i == steps - 301) {
@@ -585,9 +597,19 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
       asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf);
       nn_file = fopen(nn_fname, "w+");
-      train_nn_on_automaton(size, states, automat300, A, 7, nn_file);
-      train_nn_on_automaton(size, states, automat50, A, 7, nn_file);
-      train_nn_on_automaton(size, states, automat5, A, 7, nn_file);
+
+      network_result_t res;
+      train_nn_on_automaton(size, states, automat300, A, 7, nn_file, &res);
+      results->nn_tr_300 = res.train_error;
+      results->nn_te_300 = res.test_error;
+
+      train_nn_on_automaton(size, states, automat50, A, 7, nn_file, &res);
+      results->nn_tr_50 = res.train_error;
+      results->nn_te_50 = res.test_error;
+
+      train_nn_on_automaton(size, states, automat5, A, 7, nn_file, &res);
+      results->nn_tr_5 = res.train_error;
+      results->nn_te_5 = res.test_error;
     }
   }
   printf("\n");

@@ -253,7 +253,7 @@ void write_results_to_file(FILE* file, double train_error, double test_error)
 void train_nn_on_automaton(size_t size, int states,
                            uint8_t train_automaton[size][size],
                            uint8_t test_automaton[size][size], int offset,
-                           FILE* output_file)
+                           FILE* output_file, network_result_t* res)
 {
   size_t num_pattern = size * size;
   int side = 2 * offset + 1;
@@ -397,6 +397,9 @@ void train_nn_on_automaton(size_t size, int states,
   test_error /= num_pattern;
 
   fprintf(stdout, "\nTrain error: %f\tTest error: %f\n", error, test_error);
+  res->train_error = error;
+  res->test_error = test_error;
+
   write_results_to_file(output_file, error, test_error);
 
   free(base_input);

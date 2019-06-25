@@ -7,7 +7,15 @@
 #include "rule.h"
 
 #define DIRICHLET 1
-#define D_CONST 0.5
+#define D_CONST 0.8
+
+void populate_buf(uint64_t grule_size, uint8_t* rule_array, char* rule_buf)
+{
+  /* Populate buffer with newly created rule */
+  for (uint64_t v = 0; v < grule_size; v++) {
+    sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
+  }
+}
 
 /**
  * Symmetrize the rule by setting all the states and their symmetries to having
@@ -167,7 +175,7 @@ void generate_general_rule(uint64_t grule_size,
     gsl_rng_env_setup();
 
     T = gsl_rng_default;
-    r = gsl_rng_alloc (T);
+    r = gsl_rng_alloc(T);
     time_t t;
     gsl_rng_set(r, (unsigned long)time(&t));
 
@@ -202,10 +210,42 @@ void generate_general_rule(uint64_t grule_size,
 
   symmetrize_rule(grule_size, rule_array, states, horizon);
 
-  /* Populate buffer with newly created rule */
-  for (uint64_t v = 0; v < grule_size; v++) {
-    sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
+  populate_buf(grule_size, rule_array, rule_buf);
+}
+
+
+void perturb_rule(uint64_t grule_size,
+                  uint8_t rule_array[grule_size],
+                  char rule_buf[grule_size + 1],
+                  int states, int horizon, double rate)
+{
+  for (uint64_t v = 0; v < grule_size; ++v) {
+    /* Perturb transisition outcome with probability rate */
+    double rand_num = (double)rand() / (double)((unsigned)RAND_MAX + 1);
+    if (rand_num < rate) {
+      rule_array[v] += (1 + rand() % (states - 1));
+      rule_array[v] %= states;
+    }
   }
+
+  symmetrize_rule(grule_size, rule_array, states, horizon);
+  populate_buf(grule_size, rule_array, rule_buf);
+}
+
+void make_map(struct Options2D* opts, char* rule_buf, int step)
+{
+  FILE* dic_file;
+  char* fname;
+
+  asprintf(&fname, "data_2d_%i/map/%lu.map", opts->states, hash(rule_buf));
+  dic_file = fopen(fname, "w+");
+  fprintf(dic_file, "%s", rule_buf);
+  fclose(dic_file);
+  free(fname);
+
+  sprintf(rule_buf, "%lu", hash(rule_buf));
+  printf("%i: Rule %s\n", step, rule_buf);
+
 }
 
 void generate_totalistic_rule(uint64_t rule_size, uint8_t rule_array[rule_size],

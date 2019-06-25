@@ -16,20 +16,34 @@ then TIME=1000;
 else TIME=$3;
 fi
 
+if [ -z $4 ];
+then SIZE=256;
+else SIZE=$4;
+fi
 
-./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$1.map" -t $TIME ||
+if [ -z $5 ];
+then GRAIN=50;
+else GRAIN=$5;
+fi
+
+if [ -z $6 ];
+then DELAY=30;
+else DELAY=$6;
+fi
+
+./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$1.map" -t $TIME -s $SIZE -w $GRAIN -e ||
     { echo 'Map file not found'; exit 1; }
 
 i=0;
 for fname in `ls rule_gif/*.step | sort -V`; do
-    ./step_to_ppm $fname 256 $STATES \
+    ./step_to_ppm $fname $SIZE $STATES \
         | pamtogif > rule_gif/tmp_$(printf "%05d" $i).gif \
         && i=$((i+1));
 done;
-gifsicle -d 30 --loop `ls -v rule_gif/tmp*.gif` --scale 2 \
+gifsicle -d $DELAY --loop `ls -v rule_gif/tmp*.gif` --scale 3 \
          > rule_gif/temp.gif
 
 rm rule_gif/tmp_*.step
 rm rule_gif/tmp_*.gif
 
-open rule_gif/temp.gif
+# open rule_gif/temp.gif
