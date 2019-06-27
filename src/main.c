@@ -12,16 +12,16 @@
 
 const char help[] = "Use with either 2d or 1d as first argument";
 
-struct str
+typedef struct val_idx_s
 {
   double value;
   int index;
-};
+} val_idx_t;
 
 int cmp(const void *a, const void *b)
 {
-  struct str *a1 = (struct str *)a;
-  struct str *a2 = (struct str *)b;
+  val_idx_t *a1 = (val_idx_t *)a;
+  val_idx_t *a2 = (val_idx_t *)b;
   if ((*a1).value > (*a2).value)
     return -1;
   else if ((*a1).value < (*a2).value)
@@ -32,7 +32,9 @@ int cmp(const void *a, const void *b)
 
 double compute_score(results_nn_t* res)
 {
+  /* For now, hardcoded weighting coefs for score */
   double a = 6./10., b = 3./10., c = 1./10.;
+
   /* Either premature stop or some training did go to 0 */
   if (res->nn_tr_300 * res->nn_tr_50 * res->nn_tr_5 == 0) {
     return 0.;
@@ -67,8 +69,8 @@ void iterative_search(int n_simulations, int input_flag,
   uint8_t** children = (uint8_t**) malloc(sizeof(uint8_t *)
                                           * population_size
                                           * n_children);
-  struct str* results =
-    (struct str*) malloc(sizeof(struct str) *
+  val_idx_t* results =
+    (val_idx_t*) malloc(sizeof(val_idx_t) *
                          population_size * (n_children + 1));
 
   for (int i = 0; i < n_simulations; ++i) {
@@ -169,7 +171,7 @@ void iterative_search(int n_simulations, int input_flag,
       }
       else {
         int child_index = (index % (n_children + 1)) +
-          n_children * index / (n_children + 1);
+          n_children * (index / (n_children + 1));
 
         memcpy(tmp_pop[k],
                children[child_index],
