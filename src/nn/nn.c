@@ -53,12 +53,13 @@ double rand_normal()
  * examples from automaton.
  */
 void fill_input_target(size_t size, double* input, uint8_t* target,
-                       uint8_t automaton[size][size], int offset)
+                       uint8_t automaton[size][size], int offset, int states)
 {
   size_t index;
   int counter;
   int side = 2 * offset + 1;
   int num_input = side * side - 1;
+  uint8_t val;
 
   for (size_t i = 0; i < size; ++i) {
     for (size_t j = 0; j < size; ++j) {
@@ -71,9 +72,11 @@ void fill_input_target(size_t size, double* input, uint8_t* target,
       for (int a = -offset; a < offset + 1; ++a) {
         for (int b = -offset; b < offset + 1; ++b) {
           if (a != 0 || b != 0) {  /* Don't take index i,j */
-            input[index * (num_input + 1) + counter] =
-              (double)automaton[(i + a + size) % size][(j + b + size) % size];
-            counter++;
+            val = automaton[(i + a + size) % size][(j + b + size) % size];
+            for (int s = 0; s < states; ++s) {
+              input[index * (num_input + 1) + counter] = (val == s) ? 1.: 0.;
+              counter++;
+            }
           }
         }
       }
@@ -257,7 +260,7 @@ void train_nn_on_automaton(size_t size, int states,
 {
   size_t num_pattern = size * size;
   int side = 2 * offset + 1;
-  int num_input = side * side - 1;
+  int num_input = states * side * side - 1;
   int num_hidden = NUMHID;
   int num_output = states;
 
@@ -268,7 +271,7 @@ void train_nn_on_automaton(size_t size, int states,
   /* Array that holds the training labels */
   uint8_t* target = (uint8_t *) malloc(num_pattern * sizeof(uint8_t));
   /* Fill those arrays with the automaton's content */
-  fill_input_target(size, base_input, target, train_automaton, offset);
+  fill_input_target(size, base_input, target, train_automaton, offset, states);
 
   /* Weights of the network */
   double weight_ih[(num_input + 1) * num_hidden];
@@ -289,7 +292,7 @@ void train_nn_on_automaton(size_t size, int states,
     malloc(sizeof(double) * (num_hidden + 1) * num_output);
 
 
-  double batch_error, error, eta = 0.0005, alpha = 0.9, batch_size = 8;
+  double batch_error, error, eta = 0.001, alpha = 0.9, batch_size = 8;
   /* Regression parameter */
   double reg = 0.0;
 
@@ -377,7 +380,7 @@ void train_nn_on_automaton(size_t size, int states,
     if (epoch%5 == 0) fprintf(stdout, "\nEpoch %d: Error = %f", epoch, error);
   }
 
-  fill_input_target(size, base_input, target, test_automaton, offset);
+  fill_input_target(size, base_input, target, test_automaton, offset, states);
 
   output =
     (double *) realloc(output, sizeof(double) * num_pattern * num_output);

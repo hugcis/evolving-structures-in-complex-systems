@@ -8,7 +8,7 @@
 #include "automaton/wolfram_automaton.h"
 #include "utils/utils.h"
 
-#define RATE 0.01
+#define RATE 0.005
 
 const char help[] = "Use with either 2d or 1d as first argument";
 
@@ -30,6 +30,22 @@ int cmp(const void *a, const void *b)
     return 0;
 }
 
+double compute_score(results_nn_t* res)
+{
+  double a = 6./10., b = 3./10., c = 1./10.;
+  /* Either premature stop or some training did go to 0 */
+  if (res->nn_tr_300 * res->nn_tr_50 * res->nn_tr_5 == 0) {
+    return 0.;
+  }
+  /* Everything went well */
+  else {
+      return ((res->nn_tr_5 > 1e-3) ? 1: 0) *
+      ((res->nn_tr_5/res->nn_tr_300 > 1) ? 1: 0)
+      * (a * res->nn_te_300/res->nn_tr_300
+         + b * res->nn_te_50/res->nn_tr_50
+         + c * res->nn_te_5/res->nn_tr_5);
+  }
+}
 
 void iterative_search(int n_simulations, int input_flag,
                       long timesteps, uint64_t grule_size,
@@ -40,13 +56,20 @@ void iterative_search(int n_simulations, int input_flag,
   char* genealogy_fname;
 
   int population_size = 5;
-  int n_children = 5;
-  results_nn_t res;
-  uint8_t** population = malloc(sizeof(uint8_t *) * population_size);
-  uint8_t** children = malloc(sizeof(uint8_t *) *
-                              population_size * n_children);
-  struct str* results = (struct str*) malloc(sizeof(struct str) *
-                                             population_size * n_children);
+  int n_children = 10;
+  results_nn_t res = {0, 0, 0, 0, 0, 0};
+
+  uint8_t** population = (uint8_t**) malloc(sizeof(uint8_t *)
+                                            * population_size);
+  uint8_t** tmp_pop = (uint8_t**) malloc(sizeof(uint8_t *)
+                                         * population_size);
+
+  uint8_t** children = (uint8_t**) malloc(sizeof(uint8_t *)
+                                          * population_size
+                                          * n_children);
+  struct str* results =
+    (struct str*) malloc(sizeof(struct str) *
+                         population_size * (n_children + 1));
 
   for (int i = 0; i < n_simulations; ++i) {
     /* Initialize rule */
@@ -60,9 +83,24 @@ void iterative_search(int n_simulations, int input_flag,
                hash(rule_buf));
       genealogy_file = fopen(genealogy_fname, "w+");
 
-      for (int k = 0; k < population_size; ++k) {
+      /* Initialization done in 2 times */
+      /* First: add the base rule in the initial population */
+      population[0] = (uint8_t*) malloc(sizeof(uint8_t) * grule_size);
+      tmp_pop[0] = (uint8_t*) malloc(sizeof(uint8_t) * grule_size);
+
+      memcpy(population[0], rule_array, sizeof(uint8_t) * grule_size);
+      for (int d = 0; d < n_children; ++d) {
+        children[d] =
+          (uint8_t *) malloc(sizeof(uint8_t) * grule_size);
+      }
+
+      /* Second: add some children of the base rule for the rest of the
+         population */
+      for (int k = 1; k < population_size; ++k) {
         /* Initialize a population from the base rule */
         population[k] = (uint8_t*) malloc(sizeof(uint8_t) * grule_size);
+        tmp_pop[k] = (uint8_t*) malloc(sizeof(uint8_t) * grule_size);
+
         memcpy(population[k], rule_array, sizeof(uint8_t) * grule_size);
 
         perturb_rule(grule_size, population[k], rule_buf, opts->states,
@@ -77,6 +115,24 @@ void iterative_search(int n_simulations, int input_flag,
     }
 
     for (int k = 0; k < population_size; ++k) {
+      /* Compute results for the parents */
+
+      populate_buf(grule_size, population[k], rule_buf);
+      make_map(opts, rule_buf, i);
+
+      res.nn_tr_5 = 0.;
+      res.nn_tr_50 = 0.;
+      res.nn_tr_300 = 0.;
+
+      process_rule(grule_size, population[k],
+                   rule_buf, 0, timesteps,
+                   opts, &res);
+
+      results[k * (n_children + 1) + n_children].index =
+        k * (n_children + 1) + n_children;
+      results[k * (n_children + 1) + n_children].value = compute_score(&res);
+
+      /* Compute results for children */
       for (int d = 0; d < n_children; ++d) {
         memcpy(children[k * n_children + d], population[k],
                sizeof(uint8_t) * grule_size);
@@ -86,35 +142,43 @@ void iterative_search(int n_simulations, int input_flag,
 
         make_map(opts, rule_buf, i);
 
-        res.nn_tr_5 = 0;
-        res.nn_tr_50 = 0;
-        res.nn_tr_300 = 0;
+        res.nn_tr_5 = 0.;
+        res.nn_tr_50 = 0.;
+        res.nn_tr_300 = 0.;
 
         process_rule(grule_size, children[k * n_children + d],
                      rule_buf, 0, timesteps, opts, &res);
 
-        results[k * n_children + d].index = k * n_children + d;
-
-        /* Either premature stop or some training did go to 0 */
-        if (res.nn_tr_300 * res.nn_tr_50 * res.nn_tr_5 == 0) {
-          results[k * n_children + d].value = 0.;
-        }
-        /* Everything went well */
-        else {
-          results[k * n_children + d].value =
-            ((res.nn_tr_5/res.nn_tr_300 > 1) ? 1: 0)
-            * ((1./3.) * res.nn_te_300/res.nn_tr_300
-               + (1./8.) * res.nn_te_50/res.nn_tr_50
-               + (13./24.) * res.nn_te_5/res.nn_tr_5);
-        }
+        results[k * (n_children + 1) + d].index = k * (n_children + 1) + d;
+        results[k * (n_children + 1) + d].value = compute_score(&res);
       }
     }
 
-    qsort(results, n_children * population_size, sizeof(results[0]), cmp);
+    /* Keep the best `population_size` results */
+    qsort(results,
+          (n_children + 1) * population_size,
+          sizeof(results[0]), cmp);
+
     for (int k = 0; k < population_size; ++k) {
-      memcpy(population[k],
-             children[results[n_children * population_size - 1 - k].index],
-             sizeof(uint8_t) * grule_size);
+      int index = results[(n_children + 1) * population_size - 1 - k].index;
+
+      if ((index % (n_children + 1)) == n_children) {
+        memcpy(tmp_pop[k],
+               population[index / (n_children + 1)],
+               sizeof(uint8_t) * grule_size);
+      }
+      else {
+        int child_index = (index % (n_children + 1)) +
+          n_children * index / (n_children + 1);
+
+        memcpy(tmp_pop[k],
+               children[child_index],
+               sizeof(uint8_t) * grule_size);
+      }
+    }
+
+    for (int k = 0; k < population_size; ++ k) {
+      memcpy(population[k], tmp_pop[k], sizeof(uint8_t) * grule_size);
 
       populate_buf(grule_size, population[k], rule_buf);
       fprintf(genealogy_file, "%lu\t", hash(rule_buf));
@@ -126,14 +190,18 @@ void iterative_search(int n_simulations, int input_flag,
   /* Free data structures */
   for (int k = 0; k < population_size; ++k) {
     free(population[k]);
+    free(tmp_pop[k]);
     for (int d = 0; d < n_children; ++d) {
       free(children[k * n_children + d]);
     }
   }
   fclose(genealogy_file);
+  free(results);
+  free(tmp_pop);
   free(genealogy_fname);
   free(population);
   free(children);
+
 }
 
 
@@ -229,7 +297,7 @@ int main_2d(int argc, char** argv)
   const uint64_t grule_size = (int) pow(opts.states, neigh_size + 1);
 
   /* These arrays can be very big and are therefore allocated on the heap */
-  char* rule_buf = malloc(grule_size * sizeof(char));
+  char* rule_buf = malloc((grule_size + 1) * sizeof(char));
   uint8_t* rule_array = malloc(grule_size * sizeof(uint8_t));
 
 

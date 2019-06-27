@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief All 2D automaton functions.
+ */
 #include <math.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -8,9 +12,12 @@
 enum WriteStepMode { TMP_FILE, STEP_FILE };
 enum EarlyStop { EARLY, NO_STOP };
 
+/** A set of options to pass for generating and processing an automaton from a
+ *  rule.
+ */
 struct Options2D {
-  size_t size;
-  int grain_write;
+  size_t size; /**< The size of the square grid. */
+  int grain_write; /**< The grain at which write operations are executed. */
   int grain;
   enum WriteStepMode save_flag;
   int states;
@@ -45,6 +52,11 @@ void process_rule(uint64_t grule_size,
                   struct Options2D*,
                   results_nn_t*);
 
+/**
+ * @brief Update the automaton state with rule.
+ *
+ * This function updates an automaton `A` with rule `rule`.
+ */
 void update_step_general(uint64_t grule_size, size_t size,
                          uint8_t [size][size],
                          uint8_t rule[grule_size],

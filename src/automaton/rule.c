@@ -15,6 +15,7 @@ void populate_buf(uint64_t grule_size, uint8_t* rule_array, char* rule_buf)
   for (uint64_t v = 0; v < grule_size; v++) {
     sprintf(&rule_buf[v], "%"PRIu8, rule_array[v]);
   }
+  rule_buf[grule_size] = '\0';
 }
 
 /**

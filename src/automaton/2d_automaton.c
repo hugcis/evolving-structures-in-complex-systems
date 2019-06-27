@@ -69,6 +69,7 @@ void print_bits(size_t dim1, size_t dim2, uint8_t a[dim1][dim2], char* buf)
 
 /**
  * @brief Automaton initializer function.
+ *
  */
 void init_automat(size_t size, uint8_t a[size][size], int states)
 {
@@ -87,7 +88,6 @@ void init_automat(size_t size, uint8_t a[size][size], int states)
     }
   }
 }
-
 
 void update_step_general(uint64_t grule_size, size_t size,
                          uint8_t A[size][size],
@@ -385,7 +385,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
   int last_compressed_size;
   int compressed_size;
-  /* int agg_compressed_size; */
   int last_cell_count;
   int cell_count = 0;
   int size_sum;
@@ -447,7 +446,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       compressed_size = compress_memory_size(out_string, (size + 1) * size);
       cell_count = count_cells(size, A, states);
 
-      /* Check if state has evolved from last time (stop mechanism)*/
+      /* Check if state has evolved from last time (stop mechanism) */
       if (compressed_size == last_compressed_size
           && flag == 1 && opts->early == EARLY) {
         printf("\n");
