@@ -4,3 +4,5 @@ figures/
 rule_gif/
 bin/
 build/
+doc/html/*
+doc/latex/*
