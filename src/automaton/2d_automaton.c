@@ -273,67 +273,6 @@ double predictive_score(map_t map, int states, size_t size,
   return result / (double)(size * size);
 }
 
-double cross_entropy_between_arrays(size_t size, double* source, double* target)
-{
-  double result = 0;
-  for (size_t i = 0; i < size; ++i) {
-    result += -target[i] * log2((source[i] > PERT) ? source[i]: PERT);
-  }
-  return result;
-}
-
-int compute_cross_ent(any_t in_item, any_t in)
-{
-  int error;
-  data_struct_t* source;
-  data_struct_t* target = (data_struct_t*) in;
-  cross_ent_struct_t* item = (cross_ent_struct_t*) in_item;
-
-  /* Placeholder with uniform distribution over the states */
-  double* base_array = calloc(item->states, sizeof(double));
-  for (int i = 0; i < item->states; ++i) {
-    base_array[i] = 1/(double)item->states;
-  }
-
-  double* ph_array;
-
-  error = hashmap_get(item->source_map, target->key_string, (void**)(&source));
-  /*  By default the prediction is same proability for all states */
-  if (error==MAP_MISSING) {
-    ph_array = base_array;
-  }
-  else {
-    ph_array = source->number_array;
-  }
-  item->cross_entropy +=
-    cross_entropy_between_arrays(item->states,
-                                 ph_array,
-                                 target->number_array);
-  free(base_array);
-  return MAP_OK;
-}
-
-double map_cross_entropy(map_t map_source, size_t size,
-                         uint8_t automaton[size][size], int offset, int states)
-{
-  double cross_ent;
-  int key_len = (2*offset + 1) * (2*offset + 1) + 1;
-  char key[key_len];
-  cross_ent_struct_t* item = calloc(1, sizeof(cross_ent_struct_t));
-  item->states = states;
-  item->source_map = map_source;
-
-  for (size_t i = 0; i < size; ++i) {
-    for (size_t j = 0; j < size; ++j) {
-      build_key_string(key_len, key, size, automaton, offset, i, j);
-    }
-  }
-
-  cross_ent = item->cross_entropy;
-  free(item);
-  return cross_ent;
-}
-
 int free_data(any_t _, any_t in)
 {
   (void)(_); /* Unused parameter */
