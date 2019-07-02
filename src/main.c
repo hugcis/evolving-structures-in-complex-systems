@@ -8,7 +8,7 @@
 #include "automaton/wolfram_automaton.h"
 #include "utils/utils.h"
 
-#define RATE 0.005
+#define RATE 0.05
 
 const char help[] = "Use with either 2d or 1d as first argument";
 
@@ -33,19 +33,19 @@ int cmp(const void *a, const void *b)
 double compute_score(results_nn_t* res)
 {
   /* For now, hardcoded weighting coefs for score */
-  double a = 6./10., b = 3./10., c = 1./10.;
+  double a = 7./10., b = 7./10., c = -4./10.;
 
   /* Either premature stop or some training did go to 0 */
-  if (res->nn_tr_300 * res->nn_tr_50 * res->nn_tr_5 == 0) {
+  if (res->nn_te_300 * res->nn_te_50 * res->nn_te_5 == 0) {
     return 0.;
   }
   /* Everything went well */
   else {
       return ((res->nn_tr_5 > 1e-3) ? 1: 0) *
       ((res->nn_tr_5/res->nn_tr_300 > 1) ? 1: 0)
-      * (a * res->nn_te_300/res->nn_tr_300
-         + b * res->nn_te_50/res->nn_tr_50
-         + c * res->nn_te_5/res->nn_tr_5);
+      * (a * res->nn_tr_300/res->nn_te_300
+         + b * res->nn_tr_50/res->nn_te_50
+         + c * res->nn_tr_5/res->nn_te_5);
   }
 }
 

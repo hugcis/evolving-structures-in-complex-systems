@@ -11,24 +11,22 @@
 #define NEIGHBORS 3
 
 
-char* print_bits_spaced(int bits_to_read, uint8_t a[bits_to_read])
+void print_bits_spaced(int bits_to_read, uint8_t a[bits_to_read],
+                       char buf[bits_to_read + 1])
 {
-  char* buf = (char*)malloc((bits_to_read + 1) * sizeof(char));
-
   for (int i = 0; i < bits_to_read; i++) {
     buf[i] = a[i] + '0';
   }
   buf[bits_to_read] = '\0';
-  return buf;
 }
 
 
 void update_step(size_t size, size_t rule_size, uint8_t base[size],
-                 uint8_t rule[rule_size], int states, int radius)
+                 uint8_t placeholder[size],
+                 uint8_t rule[rule_size],
+                 int states, int radius)
 {
-  uint8_t* A = (uint8_t*)malloc(size * sizeof(uint8_t));
-
-  memcpy(A, base, size * sizeof(uint8_t));
+  memcpy(placeholder, base, size * sizeof(uint8_t));
 
   for (size_t r = 0; r < size; r++) {
     int c = 0;
@@ -37,11 +35,10 @@ void update_step(size_t size, size_t rule_size, uint8_t base[size],
         c += ipow(states, 2 * radius - (w + radius));
       }
     }
-    A[r] = rule[c];
+    placeholder[r] = rule[c];
   }
 
-  memcpy(base, A, size * sizeof(uint8_t));
-  free(A);
+  memcpy(base, placeholder, size * sizeof(uint8_t));
 }
 
 static void init_automat(int states, size_t size, uint8_t a[size],
@@ -85,9 +82,9 @@ void write_step(size_t size, size_t rule_size, uint8_t A[size],
 
   steps_file = fopen(steps_fname, "w+");
 
-  char* output_string = print_bits_spaced(size, A);
+  char output_string[size + 1];
+  print_bits_spaced(size, A, output_string);
   fputs(output_string, steps_file);
-  free(output_string);
   fclose(steps_file);
 }
 
@@ -108,12 +105,14 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
            rule_number(states, rule_size, rule));
   out_steps_file = fopen(out_steps_fname, "w+");
 
-  char* spaced_output;
-  char* final_output;
   char* dbl_ouput = (char*) malloc(( 2 * size + 1 ) * sizeof(char));
 
   uint8_t A[size];
+  uint8_t placeholder[size];
   uint8_t final[size];
+  char spaced_output[size + 1];
+  char final_output[size + 1];
+
   init_automat(states, size, A, options->init);
   memcpy(final, A, size * sizeof(uint8_t));
 
@@ -121,21 +120,23 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
   int end_comp_size = 0, comp_size = 0, dbl_comp_size = 0;
 
   for (v = 0; v < steps; ++v) {
-    update_step(size, rule_size, final, rule, states, options->radius);
+    update_step(size, rule_size, final, placeholder, rule,
+                states, options->radius);
   }
-  final_output = print_bits_spaced(size, final);
+  print_bits_spaced(size, final, final_output);
   end_comp_size = compress_memory_size(final_output, size);
 
   for (v = 0; v < steps; ++v) {
 
-    spaced_output = print_bits_spaced(size, A);
+    print_bits_spaced(size, A, spaced_output);
     fprintf(out_steps_file, "%s\n", spaced_output);
 
     if (print_automaton == 1) {
-      printf("%s\n", print_bits_spaced(size, A));
+      printf("%s\n", spaced_output);
     }
 
-    update_step(size, rule_size, A, rule, states, options->radius);
+    update_step(size, rule_size, A, placeholder,
+                rule, states, options->radius);
 
     if (v % options->grain == 0) {
       comp_size = compress_memory_size(spaced_output, size);
@@ -153,11 +154,8 @@ void write_to_file(size_t size, size_t rule_size, uint8_t rule[rule_size],
         printf("%i\t", comp_size);
       }
     }
-    free(spaced_output);
-
   }
   printf("%i\t%i\t%i", end_comp_size, comp_size, dbl_comp_size);
-  free(final_output);
   fclose(out_file);
   fclose(out_steps_file);
 }
