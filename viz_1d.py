@@ -7,10 +7,14 @@ STEP_DIR = "steps/"
 
 RULE = sys.argv[1:]
 
-fig, axs = plt.subplots(len(RULE)//3 + (1 if not len(RULE)//3 else 0),
-                        3, sharex=True, sharey=True,
-                        figsize=(6 * 3, 4 * len(RULE)//3))
+COLS = 3 if len(RULE) > 3 else len(RULE)
+ROWS = len(RULE)//3 + (1 if not len(RULE)//3 else 0)
+fig, axs = plt.subplots(ROWS,
+                        COLS, sharex=True, sharey=True,
+                        figsize=(6 * COLS, 4 * ROWS))
 if len(RULE) == 1:
+    axs = [[axs]]
+elif len(RULE) <= 3:
     axs = [axs]
 
 for n, rule in enumerate(RULE):
