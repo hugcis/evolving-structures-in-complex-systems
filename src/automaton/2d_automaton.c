@@ -537,17 +537,19 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       nn_file = fopen(nn_fname, "w+");
 
       network_result_t res;
-      train_nn_on_automaton(size, states, automat300, A, 7, nn_file, &res);
+      network_opts_t opts = {10, 30, 3};
+      train_nn_on_automaton(size, states, automat300, A, nn_file, &opts, &res);
       results->nn_tr_300 = res.train_error;
       results->nn_te_300 = res.test_error;
 
-      train_nn_on_automaton(size, states, automat50, A, 7, nn_file, &res);
+      train_nn_on_automaton(size, states, automat50, A, nn_file, &opts, &res);
       results->nn_tr_50 = res.train_error;
       results->nn_te_50 = res.test_error;
 
-      train_nn_on_automaton(size, states, automat5, A, 7, nn_file, &res);
+      train_nn_on_automaton(size, states, automat5, A, nn_file, &opts, &res);
       results->nn_tr_5 = res.train_error;
       results->nn_te_5 = res.test_error;
+
     }
   }
   printf("\n");

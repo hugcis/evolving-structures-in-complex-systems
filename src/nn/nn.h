@@ -2,6 +2,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct network_opts_s
+{
+  int num_hid;
+  int max_epoch;
+  int offset;
+} network_opts_t;
+
 typedef struct network_result_s
 {
   double train_error;
@@ -9,5 +16,6 @@ typedef struct network_result_s
 } network_result_t;
 
 void train_nn_on_automaton(size_t size, int, uint8_t[size][size],
-                           uint8_t[size][size], int, FILE*,
+                           uint8_t[size][size], FILE*,
+                           network_opts_t*,
                            network_result_t*);
