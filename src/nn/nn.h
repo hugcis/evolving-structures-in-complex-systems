@@ -16,6 +16,6 @@ typedef struct network_result_s
 } network_result_t;
 
 void train_nn_on_automaton(size_t size, int, uint8_t[size][size],
-                           uint8_t[size][size], FILE*,
+                           uint8_t[size][size],
                            network_opts_t*,
                            network_result_t*);

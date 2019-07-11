@@ -231,8 +231,7 @@ int reduce_entropy(any_t state_entropy, any_t in)
 
   for (int i = 0; i < state_ent->states; i ++) {
     if (data->number_array[i] > 0) {
-      state_ent->entropy += -log(data->number_array[i]) *
-        (data->number_array[i]);
+      state_ent->entropy += -log(data->number_array[i]);
     }
   }
   state_ent->visited += 1;
@@ -297,10 +296,14 @@ void add_results_to_file(map_t map_source, size_t size,
   entrop_state_ph_t* result = entropy_score(map_source, states);
   fprintf(file, "%f    %f    %"PRIu32"    ",
           predictive_score(map_source, states, size, automaton, offset),
-          result->entropy, result->visited);
+          result->entropy / ((double) size * size), result->visited);
   free(result);
 }
 
+void add_nn_results_to_file(FILE* file, network_result_t* res)
+{
+  fprintf(file, "%f    %f\n", res->train_error, res->test_error);
+}
 
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[],
@@ -327,7 +330,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   int last_cell_count;
   int cell_count = 0;
   int size_sum;
-  int offset_a = 2, offset_b = 1;
   float ratio = 0;
   float ratio2 = 0;
 
@@ -446,6 +448,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       fclose(out_step_file);
     }
 
+    int offset_a = 2, offset_b = 1;
+
     if (i == steps - 301) {
       print_bits(size, size, A, out_string300);
       populate_map(map300, size, A, offset_a, states);
@@ -534,22 +538,48 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
 
       asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf);
-      nn_file = fopen(nn_fname, "w+");
+      nn_file = fopen(nn_fname, "a");
 
       network_result_t res;
-      network_opts_t opts = {10, 30, 3};
-      train_nn_on_automaton(size, states, automat300, A, nn_file, &opts, &res);
+      network_opts_t n_opts = {10, 30, 6};
+      train_nn_on_automaton(size, states, automat300, A, &n_opts, &res);
+      add_nn_results_to_file(nn_file, res);
       results->nn_tr_300 = res.train_error;
       results->nn_te_300 = res.test_error;
 
-      train_nn_on_automaton(size, states, automat50, A, nn_file, &opts, &res);
+      train_nn_on_automaton(size, states, automat50, A, &n_opts, &res);
+      add_nn_results_to_file(nn_file, res);
       results->nn_tr_50 = res.train_error;
       results->nn_te_50 = res.test_error;
 
-      train_nn_on_automaton(size, states, automat5, A, nn_file, &opts, &res);
+      train_nn_on_automaton(size, states, automat5, A, &n_opts, &res);
+      add_nn_results_to_file(nn_file, res);
       results->nn_tr_5 = res.train_error;
       results->nn_te_5 = res.test_error;
 
+      /* n_opts.offset = 7; */
+      /* train_nn_on_automaton(size, states, automat300, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+      /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+      /* train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+
+      /* n_opts.offset = 8; */
+      /* train_nn_on_automaton(size, states, automat300, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+      /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+      /* train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+
+      /* n_opts.offset = 10; */
+      /* train_nn_on_automaton(size, states, automat300, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+      /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+      /* train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
     }
   }
   printf("\n");

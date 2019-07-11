@@ -247,10 +247,6 @@ void compute_batch_gradients(int base_index,
   *batch_error /= batch_size;
 }
 
-void write_results_to_file(FILE* file, double train_error, double test_error)
-{
-  fprintf(file, "%f    %f\n", train_error, test_error);
-}
 
 double compute_test_error(int num_pattern, int num_output, int num_hidden,
                           int num_input,
@@ -283,7 +279,6 @@ double compute_test_error(int num_pattern, int num_output, int num_hidden,
 void train_nn_on_automaton(size_t size, int states,
                            uint8_t train_automaton[size][size],
                            uint8_t test_automaton[size][size],
-                           FILE* output_file,
                            network_opts_t* opts,
                            network_result_t* res)
 {
@@ -432,8 +427,6 @@ void train_nn_on_automaton(size_t size, int states,
           error, test_error, error/test_error, test_error - error);
   res->train_error = error;
   res->test_error = test_error;
-
-  write_results_to_file(output_file, error, test_error);
 
   free(base_input);
   free(input);

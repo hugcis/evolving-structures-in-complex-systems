@@ -13,7 +13,7 @@ MKDIR:=@mkdir -p
 SOURCES:=$(shell find $(SRCDIR) -type f -name "*.$(SRCEXT)")
 OBJS:=$(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.o))
 
-DIRS:= automaton utils nn
+DIRS:= automaton utils nn search
 SOURCEDIRS:=$(foreach dir, $(DIRS), $(addprefix $(SRCEDIR)/, $(dir)))
 TARGETDIRS:=$(foreach dir, $(DIRS), $(addprefix $(BUILDDIR)/, $(dir)))
 
