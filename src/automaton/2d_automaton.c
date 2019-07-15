@@ -6,7 +6,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include "2d_automaton.h"
-#include "rule.h"
+#include "automaton/rule.h"
 #include "nn/nn.h"
 #include "utils/compress.h"
 #include "utils/utils.h"
@@ -541,51 +541,35 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       nn_file = fopen(nn_fname, "a");
 
       network_result_t res;
-      network_opts_t n_opts = {10, 30, 6};
+      network_opts_t n_opts = {10, 30, 2};
       train_nn_on_automaton(size, states, automat300, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, res);
+      add_nn_results_to_file(nn_file, &res);
       results->nn_tr_300 = res.train_error;
       results->nn_te_300 = res.test_error;
 
       train_nn_on_automaton(size, states, automat50, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, res);
+      add_nn_results_to_file(nn_file, &res);
       results->nn_tr_50 = res.train_error;
       results->nn_te_50 = res.test_error;
 
       train_nn_on_automaton(size, states, automat5, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, res);
+      add_nn_results_to_file(nn_file, &res);
       results->nn_tr_5 = res.train_error;
       results->nn_te_5 = res.test_error;
 
-      /* n_opts.offset = 7; */
-      /* train_nn_on_automaton(size, states, automat300, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
-      /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
-      /* train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
+      n_opts.offset = 1;
+      train_nn_on_automaton(size, states, automat300, A, &n_opts, &res);
+      add_nn_results_to_file(nn_file, &res);
+      train_nn_on_automaton(size, states, automat50, A, &n_opts, &res);
+      add_nn_results_to_file(nn_file, &res);
+      train_nn_on_automaton(size, states, automat5, A, &n_opts, &res);
+      add_nn_results_to_file(nn_file, &res);
 
-      /* n_opts.offset = 8; */
-      /* train_nn_on_automaton(size, states, automat300, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
-      /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
-      /* train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
-
-      /* n_opts.offset = 10; */
-      /* train_nn_on_automaton(size, states, automat300, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
-      /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
-      /* train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
-      /* add_nn_results_to_file(nn_file, &res); */
     }
   }
   printf("\n");
 
   /* Cleanup before finishing */
-
   free_map(map5);
   free_map(map300);
   free_map(map50);

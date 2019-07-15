@@ -71,7 +71,7 @@ void fill_input_target(size_t size, double* input, uint8_t* target,
         for (int b = -offset; b < offset + 1; ++b) {
           if (a != 0 || b != 0) {  /* Don't take index i,j */
             val = automaton[(i + a + size) % size][(j + b + size) % size];
-            for (int s = 0; s < states; ++s) {
+            for (uint8_t s = 0; s < states; ++s) {
               input[index * (num_input + 1) + counter] = (val == s) ? 1.: 0.;
               counter++;
             }
@@ -129,6 +129,7 @@ void forward(double* input, double* output,
               input, num_input + 1, weight_ih, num_hidden,
               0.0, hidden, num_hidden);
 
+  /* ReLU non-linearity */
   for (p = 0; p < num_pattern; ++p) {
     hidden_bias[p * (num_hidden + 1)] = 1.0;
     for (j = 1; j < num_hidden + 1; ++j) {
@@ -196,16 +197,36 @@ void update_weights(int num_input, int num_hidden, int num_output,
   }
 }
 
-void compute_batch_gradients(int base_index,
+void compute_batch_gradients(int base_index, double alpha,
                              int batch_size, int num_input, int num_output,
                              int num_hidden, size_t* random_idx, double eta,
                              double* batch_error, double* output,
                              uint8_t* target, double* delta_output,
                              double* delta_w_ho, double* hidden_bias,
                              double* weight_ho, double* delta_h,
-                             double* delta_w_ih, double* input)
+                             double* delta_w_ih, double* input,
+                             double* delta_w_ih_prev,
+                             double* delta_w_ho_prev)
 {
   int i, j, k, p;
+
+  /* Gradient initialization (Nesterov momentum) */
+  memcpy(delta_w_ih_prev, delta_w_ih,
+         sizeof(double) * num_hidden * (num_input + 1));
+  for (i = 0; i < num_input + 1; ++i) {
+    for (j = 0; j < num_hidden; ++j) {
+      delta_w_ih[i * num_hidden + j] *= alpha;
+    }
+  }
+
+  memcpy(delta_w_ho_prev, delta_w_ho,
+         sizeof(double) * num_output * (num_hidden + 1));
+  for (j = 0; j < num_hidden + 1; ++j) {
+    for (k = 0; k < num_output; ++k) {
+      delta_w_ho[j * num_output + k] *= alpha;
+    }
+  }
+
   for (int b = 0; b < batch_size; ++b) {
     p = random_idx[(base_index + b)];
     /* Compute loss */
@@ -216,34 +237,40 @@ void compute_batch_gradients(int base_index,
     /* Backpropagation */
     for (k = 0; k < num_output; ++k) {
       /* Output gradients */
-      delta_output[k] = output[b * num_output + k] -
-        ((k == target[p])? 1.0: 0.0);
-
-      for (j = 0; j < num_hidden + 1; ++j) {
-        delta_w_ho[j * num_output + k] -=
-          (eta * hidden_bias[b * (num_hidden + 1) + j] *
-           delta_output[k]) / (double) batch_size;
-      }
-    }
-
-    /* Dot product weight_ho x delta_output (we don't count the bias in
-       weight_ho)*/
-    cblas_dgemv(CblasRowMajor, CblasNoTrans, num_hidden, num_output,
-                1.0, &weight_ho[num_output], num_output,
-                delta_output, 1, 0.0, delta_h, 1);
-
-    /* Hidden layer gradients */
-    for (j = 0; j < num_hidden; ++j) {
-      delta_h[j] *= ((hidden_bias[b * (num_hidden + 1) + j + 1] > 0) ?
-        1.0: 0.0);
-
-      for (i = 0; i < num_input + 1; ++i) {
-        delta_w_ih[i * num_hidden + j] -=
-          (eta * input[b * (num_input + 1) + i] *
-           delta_h[j]) / (double) batch_size;
-      }
+      delta_output[b * num_output + k] =
+        (output[b * num_output + k] - ((k == target[p])? 1.0: 0.0))
+        / (double) batch_size;
     }
   }
+
+  cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+              num_hidden + 1, num_output, batch_size,
+              - eta , hidden_bias, num_hidden + 1,
+              delta_output, num_output,
+              1.0, delta_w_ho, num_output);
+
+  /* Dot product weight_ho x delta_output (we don't count the bias in
+     weight_ho)*/
+  cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+              batch_size, num_hidden, num_output,
+              1.0, delta_output, num_output,
+              &weight_ho[num_output], num_output,
+              0.0, delta_h, num_hidden);
+
+  /* Hidden layer non linearity gradients */
+  for (int b = 0; b < batch_size; ++b) {
+    for (j = 0; j < num_hidden; ++j) {
+      delta_h[b * num_hidden + j] *=
+        ((hidden_bias[b * (num_hidden + 1) + j + 1] > 0) ? 1.0: 0.0);
+    }
+  }
+
+  cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+              num_input + 1, num_hidden, batch_size,
+              - eta , input, num_input + 1,
+              delta_h, num_hidden,
+              1.0, delta_w_ih, num_hidden);
+
   *batch_error /= batch_size;
 }
 
@@ -259,6 +286,7 @@ double compute_test_error(int num_pattern, int num_output, int num_hidden,
     (double*) malloc(sizeof(double) * num_pattern * num_hidden);
   double* hidden_bias =
     (double*) malloc(sizeof(double) * num_pattern * (num_hidden + 1));
+
   forward(input, output, num_hidden, num_pattern, num_input, num_output,
           hidden, hidden_bias, weight_ih, weight_ho);
 
@@ -288,6 +316,11 @@ void train_nn_on_automaton(size_t size, int states,
   int num_hidden = opts->num_hid;
   int num_output = states;
 
+  double batch_error, error, eta = 0.01, alpha = 0.9;
+  int batch_size = 8;
+  /* Regression parameter */
+  double reg = 0.0;
+
   /* Network and training variables declaration */
   /* num_pattern x (num_input + 1) array that holds all the training set */
   double* base_input =
@@ -307,8 +340,8 @@ void train_nn_on_automaton(size_t size, int states,
   double weight_ho[(num_hidden + 1) * num_output];
 
   /* Gradients of the output and hidden layer */
-  double delta_output[num_output];
-  double delta_h[num_hidden];
+  double delta_output[batch_size * num_output];
+  double delta_h[batch_size * num_hidden];
 
   /* Weight gradients and previous gradient for Nesterov momentum */
   double* delta_w_ih =
@@ -320,11 +353,6 @@ void train_nn_on_automaton(size_t size, int states,
   double* delta_w_ho_prev =
     malloc(sizeof(double) * (num_hidden + 1) * num_output);
 
-
-  double batch_error, error, eta = 0.005, alpha = 0.9, batch_size = 8;
-  /* Regression parameter */
-  double reg = 0.0;
-
   /* Allocate the arrays that will hold data for each batch */
   double* input =
     (double*) malloc (sizeof(double) * (batch_size) * (num_input + 1));
@@ -335,7 +363,7 @@ void train_nn_on_automaton(size_t size, int states,
   double* output =
     malloc(sizeof(double) * batch_size * num_output);
 
-  int i, j, k, epoch;
+  int epoch;
   size_t np, op, p;
   size_t random_idx[num_pattern];
   double test_error;
@@ -379,27 +407,13 @@ void train_nn_on_automaton(size_t size, int states,
       forward(input, output, num_hidden, batch_size, num_input, num_output,
               hidden, hidden_bias, weight_ih, weight_ho);
 
-      /* Gradient initialization (Nesterov momentum) */
-      for (i = 0; i < num_input + 1; ++i) {
-        for (j = 0; j < num_hidden; ++j) {
-          delta_w_ih_prev[i * num_hidden + j] = delta_w_ih[i * num_hidden + j];
-          delta_w_ih[i * num_hidden + j] =
-            alpha * delta_w_ih[i * num_hidden + j];
-        }
-      }
 
-      for (j = 0; j < num_hidden + 1; ++j) {
-        for (k = 0; k < num_output; ++k) {
-          delta_w_ho_prev[j * num_output + k] = delta_w_ho[j * num_output + k];
-          delta_w_ho[j * num_output + k] =
-            alpha * delta_w_ho[j * num_output + k];
-        }
-      }
-
-      compute_batch_gradients(s, batch_size, num_input, num_output, num_hidden,
+      compute_batch_gradients(s, alpha, batch_size, num_input, num_output,
+                              num_hidden,
                               random_idx, eta, &batch_error, output, target,
                               delta_output, delta_w_ho, hidden_bias, weight_ho,
-                              delta_h, delta_w_ih, input);
+                              delta_h, delta_w_ih, input,
+                              delta_w_ih_prev, delta_w_ho_prev);
 
       update_weights(num_input, num_hidden, num_output, &batch_error, reg,
                      alpha, weight_ih, delta_w_ih, delta_w_ih_prev, weight_ho,

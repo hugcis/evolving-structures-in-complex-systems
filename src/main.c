@@ -9,7 +9,6 @@
 #include "utils/utils.h"
 #include "search/genetic.h"
 
-#define RATE 0.05
 
 const char help[] = "Use with either 2d or 1d as first argument";
 
@@ -18,7 +17,6 @@ int main_2d(int argc, char** argv)
   char usage[] = "%s 2d [-n n_states] [-i input_rule] [-s size] [-t timesteps]"
     "[-g grain] [-c compress]";
   char one_input[] = "Give only one input, either -i rule or -f rule_file";
-
 
   extern char *optarg;
   extern int optind;

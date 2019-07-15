@@ -1,4 +1,9 @@
+#include <string.h>
 #include "nn/nn.h"
+#include "automaton/2d_automaton.h"
+#include "automaton/rule.h"
+
+#define RATE 0.05
 
 typedef struct val_idx_s
 {
