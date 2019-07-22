@@ -15,8 +15,8 @@
 #define KEY_MAX_LENGTH (256)
 #define PERT 1E-15
 
-typedef void (*ProcessF)(uint64_t, size_t size, uint8_t [size][size],
-                         uint8_t[] , uint8_t [size][size], int, int);
+typedef void (*ProcessF)(uint64_t, size_t size, uint8_t*,
+                         uint8_t[] , uint8_t* , int, int);
 
 typedef struct entrop_state_ph_s
 {
@@ -53,13 +53,13 @@ unsigned long hash(char *str)
 /**
  * Format the 2d automaton as a string in buf.
  */
-void print_bits(size_t dim1, size_t dim2, uint8_t a[dim1][dim2], char* buf)
+void print_bits(size_t dim1, size_t dim2, uint8_t* a, char* buf)
 {
   char out_string = '0';
 
   for (size_t i = 0; i < dim1; i++) {
     for (size_t j = 0; j < dim2; j++) {
-      out_string = '0' + a[i][j];
+      out_string = '0' + a[i * dim2 + j];
       buf[i * (dim1 + 1) + j] = out_string;
     }
     buf[i * (dim1 + 1) + dim2] = '\n';
@@ -71,7 +71,7 @@ void print_bits(size_t dim1, size_t dim2, uint8_t a[dim1][dim2], char* buf)
  * @brief Automaton initializer function.
  *
  */
-void init_automat(size_t size, uint8_t a[size][size], int states)
+void init_automat(size_t size, uint8_t* a, int states)
 {
   assert(size > 20);
   for (size_t i = 0; i < size; i++) {
@@ -79,20 +79,20 @@ void init_automat(size_t size, uint8_t a[size][size], int states)
       /* Initialize center 20x20 square to random */
       if ((i >= size/2 - 10) && (i < size/2 + 10) &&
           (j >= size/2 - 10) && (j < size/2 + 10)) {
-        a[i % size][j % size] = (uint8_t)(rand() % states);
+        a[(i % size) * size + (j % size)] = (uint8_t)(rand() % states);
       }
       /* Rest is 0 */
       else {
-        a[i][j] = (uint8_t)0;
+        a[i * size + j] = (uint8_t)0;
       }
     }
   }
 }
 
 void update_step_general(uint64_t grule_size, size_t size,
-                         uint8_t A[size][size],
+                         uint8_t* A,
                          uint8_t rule[grule_size],
-                         uint8_t base[size][size], int states,
+                         uint8_t* base, int states,
                          int horizon)
 {
   uint64_t position;
@@ -105,51 +105,51 @@ void update_step_general(uint64_t grule_size, size_t size,
       increment = 0;
       for (int k = - horizon; k <= horizon; k++) {
         for (int l = - horizon; l <= horizon; l++) {
-          current_value = base[(i + k + size) % size][(j + l + size) % size];
+          current_value = base[((i + k + size) % size) * size
+                               + ((j + l + size) % size)];
           position += current_value * ipow(states, increment);
           ++increment;
         }
       }
 
-      A[i][j] = rule[position];
+      A[i * size + j] = rule[position];
     }
   }
   memcpy(base, A, size * size * sizeof(uint8_t));
 }
 
 void update_step_totalistic(uint64_t rule_size, size_t size,
-                            uint8_t base[size][size],
+                            uint8_t* base,
                             uint8_t rule[rule_size],
-                            uint8_t A[size][size], int states,
+                            uint8_t* A, int states,
                             int horizon)
 {
   int count;
-  for (size_t i = 0; i < size; i++) {
-    memcpy(A[i], base[i], size * sizeof(uint8_t));
+  memcpy(A, base, size * size * sizeof(uint8_t));
 
+  for (size_t i = 0; i < size; i++) {
     for (size_t j = 0; j < size; j++) {
       count = 0;
       for (int k = - horizon; k <= horizon; k++) {
         for (int l = - horizon; l <= horizon; l++) {
           if (k != 0 | l != 0) {
-            count += base[(i + k + size) % size][(j + l + size) % size];
+            count += base[((i + k + size) % size) * size
+                          + ((j + l + size) % size)];
           }
         }
       }
-      A[i][j] = rule[states * count + base[i][j]];
+      A[i * size + j] = rule[states * count + base[i * size + j]];
     }
   }
-  for (size_t i = 0; i < size; i++) {
-    memcpy(base[i], A[i], size * sizeof(uint8_t));
-  }
+  memcpy(base, A, size * size * sizeof(uint8_t));
 }
 
-int count_cells(size_t size, uint8_t A[size][size], int states)
+int count_cells(size_t size, uint8_t* A, int states)
 {
   int* counts = (int*)calloc(states, sizeof(int));
   for (size_t i = 0; i < size; ++i) {
     for (size_t j = 0; j < size; ++j) {
-      counts[A[i][j]] += 1;
+      counts[A[i* size + j]] += 1;
     }
   }
   int value = counts[0];
@@ -180,7 +180,7 @@ int normalize_probs(any_t states, any_t data)
 }
 
 void build_key_string(int key_len, char key[key_len],
-                      size_t size, uint8_t automaton[size][size],
+                      size_t size, uint8_t* automaton,
                       int offset, size_t i, size_t j)
 {
   int key_index;
@@ -192,7 +192,8 @@ void build_key_string(int key_len, char key[key_len],
       }
       else {
         key[key_index] =
-          '0' + automaton[(i + a + size) % size][(j + b + size) % size];
+          '0' + automaton[((i + a + size) % size) * size
+                          + ((j + b + size) % size)];
       }
     }
   }
@@ -200,7 +201,7 @@ void build_key_string(int key_len, char key[key_len],
 }
 
 entrop_state_ph_t* populate_map(map_t* map, size_t size,
-                                uint8_t automaton[size][size],
+                                uint8_t* automaton,
                                 int offset, int states)
 {
   data_struct_t* value;
@@ -226,7 +227,7 @@ entrop_state_ph_t* populate_map(map_t* map, size_t size,
         error = hashmap_put(map, value->key_string, value);
         assert(error==MAP_OK);
       }
-      value->number_array[automaton[i][j]] += 1;
+      value->number_array[automaton[i * size + j]] += 1;
     }
   }
   hashmap_iterate(map, (PFany)&normalize_probs, (any_t)&states);
@@ -239,7 +240,8 @@ entrop_state_ph_t* populate_map(map_t* map, size_t size,
         out_data->entropy += -log( 1 / (double) states );
       }
       else {
-        out_data->entropy += -log(value->number_array[automaton[i][j]]);
+        out_data->entropy +=
+          -log(value->number_array[automaton[i * size + j]]);
       }
     }
   }
@@ -271,7 +273,7 @@ entrop_state_ph_t* entropy_score(map_t map, int states)
 }
 
 double predictive_score(map_t map, int states, size_t size,
-                        uint8_t automaton[size][size], int offset)
+                        uint8_t* automaton, int offset)
 {
   data_struct_t* value;
   int key_len = (2*offset + 1) * (2*offset + 1) + 1;
@@ -287,8 +289,8 @@ double predictive_score(map_t map, int states, size_t size,
         result += - log(1/(double)states);
       }
       else {
-        result +=  - log((value->number_array[automaton[i][j]] > PERT) ?
-                          value->number_array[automaton[i][j]]: PERT);
+        result +=  - log((value->number_array[automaton[i * size + j]] > PERT) ?
+                          value->number_array[automaton[i * size + j]]: PERT);
       }
     }
   }
@@ -313,7 +315,7 @@ void free_map(map_t map)
 }
 
 void add_results_to_file(map_t map_source, size_t size,
-                         uint8_t automaton[size][size], int states,
+                         uint8_t* automaton, int states,
                          int offset, FILE* file, entrop_state_ph_t* result)
 {
   fprintf(file, "%f    %f    %"PRIu32"    ",
@@ -365,15 +367,12 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   mult_time_file = fopen(mult_time_fname, "w+");
 
 
-  uint8_t A[size][size];
-  uint8_t base[size][size];
+  uint8_t* A = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+  uint8_t* base = (uint8_t*) calloc(size * size, sizeof(uint8_t));
 
-  uint8_t (*automat5) [size] =
-    (uint8_t (*) [size])malloc(size * size * sizeof(uint8_t));
-  uint8_t (*automat50) [size] =
-    (uint8_t (*) [size])malloc(size * size * sizeof(uint8_t));
-  uint8_t (*automat300) [size] =
-    (uint8_t (*) [size])malloc(size * size * sizeof(uint8_t));
+  uint8_t* automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+  uint8_t* automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+  uint8_t* automat300 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
 
   init_automat(size, A, states);
   memcpy(base, A, size * size * sizeof(uint8_t));

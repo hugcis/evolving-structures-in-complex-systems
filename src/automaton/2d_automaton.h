@@ -59,9 +59,9 @@ void process_rule(uint64_t grule_size,
  * This function updates an automaton `A` with rule `rule`.
  */
 void update_step_general(uint64_t grule_size, size_t size,
-                         uint8_t [size][size],
+                         uint8_t*,
                          uint8_t rule[grule_size],
-                         uint8_t [size][size], int, int);
+                         uint8_t*, int, int);
 
 void generate_general_rule(uint64_t grule_size,
                            uint8_t rule_array[grule_size],

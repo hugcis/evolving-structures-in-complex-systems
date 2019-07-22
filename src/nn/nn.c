@@ -51,7 +51,7 @@ double rand_normal()
  * examples from automaton.
  */
 void fill_input_target(size_t size, double* input, uint8_t* target,
-                       uint8_t automaton[size][size], int offset, int states)
+                       uint8_t* automaton, int offset, int states)
 {
   size_t index;
   int counter;
@@ -70,7 +70,8 @@ void fill_input_target(size_t size, double* input, uint8_t* target,
       for (int a = -offset; a < offset + 1; ++a) {
         for (int b = -offset; b < offset + 1; ++b) {
           if (a != 0 || b != 0) {  /* Don't take index i,j */
-            val = automaton[(i + a + size) % size][(j + b + size) % size];
+            val = automaton[((i + a + size) % size) * size
+                            + ((j + b + size) % size)];
             for (uint8_t s = 0; s < states; ++s) {
               input[index * (num_input + 1) + counter] = (val == s) ? 1.: 0.;
               counter++;
@@ -79,7 +80,7 @@ void fill_input_target(size_t size, double* input, uint8_t* target,
         }
       }
 
-      target[index] = automaton[i][j];
+      target[index] = automaton[i * size + j];
     }
   }
 }
@@ -305,8 +306,8 @@ double compute_test_error(int num_pattern, int num_output, int num_hidden,
 }
 
 void train_nn_on_automaton(size_t size, int states,
-                           uint8_t train_automaton[size][size],
-                           uint8_t test_automaton[size][size],
+                           uint8_t* train_automaton,
+                           uint8_t* test_automaton,
                            network_opts_t* opts,
                            network_result_t* res)
 {
