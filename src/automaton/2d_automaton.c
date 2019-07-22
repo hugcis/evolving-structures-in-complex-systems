@@ -168,6 +168,9 @@ int normalize_probs(any_t states, any_t data)
   int st = *(int*)states;
   double sum = 0;
   for (int i = 0; i < st; i++) {
+    if (in->number_array[i] == 0.0) {
+      in->number_array[i] += 1E-3;
+    }
     sum += in->number_array[i];
   }
   for (int i = 0; i < st; i++) {
@@ -196,13 +199,18 @@ void build_key_string(int key_len, char key[key_len],
   key[key_len - 1] = '\0';
 }
 
-void populate_map(map_t* map, size_t size, uint8_t automaton[size][size],
-                  int offset, int states)
+entrop_state_ph_t* populate_map(map_t* map, size_t size,
+                                uint8_t automaton[size][size],
+                                int offset, int states)
 {
   data_struct_t* value;
+  entrop_state_ph_t* out_data =
+    (entrop_state_ph_t *) calloc(1, sizeof(entrop_state_ph_t));
+
   int key_len = (2*offset + 1) * (2*offset + 1) + 1;
   char key[key_len];
   int error;
+  out_data->entropy = 0.0;
 
   for (size_t i = 0; i < size; i++) {
     for (size_t j = 0; j < size; j++) {
@@ -222,6 +230,21 @@ void populate_map(map_t* map, size_t size, uint8_t automaton[size][size],
     }
   }
   hashmap_iterate(map, (PFany)&normalize_probs, (any_t)&states);
+
+  for (size_t i = 0; i < size; i++) {
+    for (size_t j = 0; j < size; j++) {
+      build_key_string(key_len, key, size, automaton, offset, i, j);
+      error = hashmap_get(map, key, (void**)(&value));
+      if (error==MAP_MISSING) {
+        out_data->entropy += -log( 1 / (double) states );
+      }
+      else {
+        out_data->entropy += -log(value->number_array[automaton[i][j]]);
+      }
+    }
+  }
+  out_data->entropy /= (double) (size * size);
+  return out_data;
 }
 
 int reduce_entropy(any_t state_entropy, any_t in)
@@ -261,10 +284,10 @@ double predictive_score(map_t map, int states, size_t size,
       build_key_string(key_len, key, size, automaton, offset, i, j);
       error = hashmap_get(map, key, (void**)(&value));
       if (error==MAP_MISSING) {
-        result += - log2(1/(double)states);
+        result += - log(1/(double)states);
       }
       else {
-        result +=  - log2((value->number_array[automaton[i][j]] > PERT) ?
+        result +=  - log((value->number_array[automaton[i][j]] > PERT) ?
                           value->number_array[automaton[i][j]]: PERT);
       }
     }
@@ -291,12 +314,11 @@ void free_map(map_t map)
 
 void add_results_to_file(map_t map_source, size_t size,
                          uint8_t automaton[size][size], int states,
-                         int offset, FILE* file)
+                         int offset, FILE* file, entrop_state_ph_t* result)
 {
-  entrop_state_ph_t* result = entropy_score(map_source, states);
   fprintf(file, "%f    %f    %"PRIu32"    ",
           predictive_score(map_source, states, size, automaton, offset),
-          result->entropy / ((double) size * size), result->visited);
+          result->entropy, result->visited);
   free(result);
 }
 
@@ -323,7 +345,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   char* entrop_fname;
 
   FILE* nn_file = NULL;
-  char* nn_fname;
+  char* nn_fname = NULL;
 
   int last_compressed_size;
   int compressed_size;
@@ -372,6 +394,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   map_t map300b = hashmap_new();
   map_t map50b = hashmap_new();
   map_t map5b = hashmap_new();
+  entrop_state_ph_t *res300, *res50, *res5, *res300b, *res50b, *res5b;
 
   int flag = 0;
 
@@ -453,8 +476,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
     if (i == steps - 301) {
       print_bits(size, size, A, out_string300);
-      populate_map(map300, size, A, offset_a, states);
-      populate_map(map300b, size, A, offset_b, states);
+      res300 = populate_map(map300, size, A, offset_a, states);
+      res300b = populate_map(map300b, size, A, offset_b, states);
 
       memcpy(automat300, A, size * size * sizeof(uint8_t));
     }
@@ -466,8 +489,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     }
     if (i == steps - 51) {
       print_bits(size, size, A, out_string50);
-      populate_map(map50, size, A, offset_a, states);
-      populate_map(map50b, size, A, offset_b, states);
+      res50 = populate_map(map50, size, A, offset_a, states);
+      res50b = populate_map(map50b, size, A, offset_b, states);
 
       memcpy(automat50, A, size * size * sizeof(uint8_t));
     }
@@ -476,8 +499,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     }
     if (i == steps - 5) {
       print_bits(size, size, A, out_string5);
-      populate_map(map5, size, A, offset_a, states);
-      populate_map(map5b, size, A, offset_b, states);
+      res5 = populate_map(map5, size, A, offset_a, states);
+      res5b = populate_map(map5b, size, A, offset_b, states);
 
       memcpy(automat5, A, size * size * sizeof(uint8_t));
     }
@@ -526,45 +549,51 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
       entrop_file = fopen(entrop_fname, "w+");
 
-      add_results_to_file(map300, size, A, states, offset_a, entrop_file);
-      add_results_to_file(map50, size, A, states, offset_a, entrop_file);
-      add_results_to_file(map5, size, A, states, offset_a, entrop_file);
+      add_results_to_file(map300, size, A, states, offset_a,
+                          entrop_file, res300);
+      add_results_to_file(map50, size, A, states, offset_a,
+                          entrop_file, res50);
+      add_results_to_file(map5, size, A, states, offset_a,
+                          entrop_file, res5);
       fprintf(entrop_file, "\n");
 
 
-      add_results_to_file(map300b, size, A, states, offset_b, entrop_file);
-      add_results_to_file(map50b, size, A, states, offset_b, entrop_file);
-      add_results_to_file(map5b, size, A, states, offset_b, entrop_file);
+      add_results_to_file(map300b, size, A, states, offset_b,
+                          entrop_file, res300b);
+      add_results_to_file(map50b, size, A, states, offset_b,
+                          entrop_file, res50b);
+      add_results_to_file(map5b, size, A, states, offset_b,
+                          entrop_file, res5b);
       fprintf(entrop_file, "\n");
 
 
       asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf);
-      nn_file = fopen(nn_fname, "a");
+      nn_file = fopen(nn_fname, "w+");
 
-      network_result_t res;
-      network_opts_t n_opts = {10, 30, 2};
+      network_result_t res = {1.};
+      network_opts_t n_opts = {10, 30, 3};
       train_nn_on_automaton(size, states, automat300, A, &n_opts, &res);
       add_nn_results_to_file(nn_file, &res);
       results->nn_tr_300 = res.train_error;
       results->nn_te_300 = res.test_error;
 
-      train_nn_on_automaton(size, states, automat50, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, &res);
-      results->nn_tr_50 = res.train_error;
-      results->nn_te_50 = res.test_error;
+      /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+      /* results->nn_tr_50 = res.train_error; */
+      /* results->nn_te_50 = res.test_error; */
 
-      train_nn_on_automaton(size, states, automat5, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, &res);
-      results->nn_tr_5 = res.train_error;
-      results->nn_te_5 = res.test_error;
+      /* train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
+      /* add_nn_results_to_file(nn_file, &res); */
+      /* results->nn_tr_5 = res.train_error; */
+      /* results->nn_te_5 = res.test_error; */
 
-      n_opts.offset = 1;
-      train_nn_on_automaton(size, states, automat300, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, &res);
-      train_nn_on_automaton(size, states, automat50, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, &res);
-      train_nn_on_automaton(size, states, automat5, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, &res);
+    /*   n_opts.offset = 1; */
+    /*   train_nn_on_automaton(size, states, automat300, A, &n_opts, &res); */
+    /*   add_nn_results_to_file(nn_file, &res); */
+    /*   train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
+    /*   add_nn_results_to_file(nn_file, &res); */
+    /*   train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
+    /*   add_nn_results_to_file(nn_file, &res); */
 
     }
   }

@@ -34,12 +34,7 @@ double compute_score(results_nn_t* res)
   }
   /* Everything went well */
   else {
-      /* return ((res->nn_tr_5 > 1e-3) ? 1: 0) * */
-      /* ((res->nn_tr_5/res->nn_tr_300 > 1) ? 1: 0) */
-      /* * (a * res->nn_te_300/res->nn_tr_300 */
-         /* + b * res->nn_te_50/res->nn_tr_50 */
-         /* + c * res->nn_te_5/res->nn_tr_5); */
-    return res->nn_te_5 / res->nn_tr_5;
+    return - res->nn_te_300 - res->nn_tr_300;
   }
 }
 
@@ -102,7 +97,7 @@ void iterative_search(int n_simulations, int input_flag,
         perturb_rule(grule_size, population[k], rule_buf, opts->states,
                       opts->horizon, RATE);
 
-        /* Allocate space for children rules */
+        /* Allocate space for childrenrules */
         for (int d = 0; d < n_children; ++d) {
           children[k * n_children + d] =
             (uint8_t *) malloc(sizeof(uint8_t) * grule_size);
@@ -116,9 +111,12 @@ void iterative_search(int n_simulations, int input_flag,
       populate_buf(grule_size, population[k], rule_buf);
       make_map(opts, rule_buf, i);
 
-      res.nn_tr_5 = 0.;
-      res.nn_tr_50 = 0.;
-      res.nn_tr_300 = 0.;
+      res.nn_tr_5 = 1.;
+      res.nn_tr_50 = 1.;
+      res.nn_tr_300 = 1.;
+      res.nn_te_5 = 1.;
+      res.nn_te_50 = 1.;
+      res.nn_te_300 = 1.;
 
       process_rule(grule_size, population[k],
                    rule_buf, 0, timesteps,
@@ -138,9 +136,12 @@ void iterative_search(int n_simulations, int input_flag,
 
         make_map(opts, rule_buf, i);
 
-        res.nn_tr_5 = 0.;
-        res.nn_tr_50 = 0.;
-        res.nn_tr_300 = 0.;
+        res.nn_tr_5 = 1.;
+        res.nn_tr_50 = 1.;
+        res.nn_tr_300 = 1.;
+        res.nn_te_5 = 1.;
+        res.nn_te_50 = 1.;
+        res.nn_te_300 = 1.;
 
         process_rule(grule_size, children[k * n_children + d],
                      rule_buf, 0, timesteps, opts, &res);
@@ -155,10 +156,21 @@ void iterative_search(int n_simulations, int input_flag,
           (n_children + 1) * population_size,
           sizeof(results[0]), cmp);
 
+    fprintf(stdout, "Best scores: ");
     for (int k = 0; k < population_size; ++k) {
-      int index = results[(n_children + 1) * population_size - 1 - k].index;
+
+
+      int index = results[k].index;
 
       if ((index % (n_children + 1)) == n_children) {
+        populate_buf(grule_size,
+                     population[index / (n_children + 1)],
+                     rule_buf);
+
+        fprintf(stdout, "p:%lu %f  ",
+                hash(rule_buf),
+                results[k].value);
+
         memcpy(tmp_pop[k],
                population[index / (n_children + 1)],
                sizeof(uint8_t) * grule_size);
@@ -166,12 +178,20 @@ void iterative_search(int n_simulations, int input_flag,
       else {
         int child_index = (index % (n_children + 1)) +
           n_children * (index / (n_children + 1));
+        populate_buf(grule_size,
+                     children[child_index],
+                     rule_buf);
+
+        fprintf(stdout, "c:%lu %f  ",
+                hash(rule_buf),
+                results[k].value);
 
         memcpy(tmp_pop[k],
                children[child_index],
                sizeof(uint8_t) * grule_size);
       }
     }
+    fprintf(stdout, "\n");
 
     for (int k = 0; k < population_size; ++ k) {
       memcpy(population[k], tmp_pop[k], sizeof(uint8_t) * grule_size);

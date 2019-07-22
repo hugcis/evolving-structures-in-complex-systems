@@ -424,7 +424,7 @@ void train_nn_on_automaton(size_t size, int states,
     error /= (double)(num_pattern/batch_size);
 
 
-    if (epoch%5 == 0) {
+    if (epoch%10 == 0) {
       fprintf(stdout, "\nEpoch %d: Error = %f", epoch, error);
       fill_input_target(size, test_input, test_target,
                         test_automaton, opts->offset, states);
@@ -438,7 +438,8 @@ void train_nn_on_automaton(size_t size, int states,
                                   weight_ih, weight_ho);
 
   fprintf(stdout, "\nTrain error: %f\tTest error: %f\t Ratio: %f\t Diff: %f\n",
-          error, test_error, error/test_error, test_error - error);
+          error, test_error, test_error/error, test_error - error);
+
   res->train_error = error;
   res->test_error = test_error;
 
