@@ -35,6 +35,8 @@ int main_2d(int argc, char** argv)
   opts.joint_complexity = 1;
   opts.early = EARLY;
   sprintf(opts.out_step_dir, "%s", "rule_gif");
+  opts.noise_rate = 0.01;
+  opts.noise_step = 133;
 
   /* Optional arguments processing */
   while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:mw:ero:")) != -1)

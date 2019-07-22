@@ -26,6 +26,8 @@ struct Options2D {
   int save_steps;
   enum EarlyStop early;
   char out_step_dir[200];
+  int noise_step;
+  double noise_rate;
 };
 
 typedef struct results_nn_s
@@ -38,6 +40,9 @@ typedef struct results_nn_s
   double nn_te_5;
 } results_nn_t;
 
+
+typedef void (*ProcessF)(size_t size, uint8_t*,
+                         uint8_t[] , uint8_t* , int, int);
 
 unsigned long hash(char*);
 
@@ -58,9 +63,9 @@ void process_rule(uint64_t grule_size,
  *
  * This function updates an automaton `A` with rule `rule`.
  */
-void update_step_general(uint64_t grule_size, size_t size,
+void update_step_general(size_t size,
                          uint8_t*,
-                         uint8_t rule[grule_size],
+                         uint8_t*,
                          uint8_t*, int, int);
 
 void generate_general_rule(uint64_t grule_size,

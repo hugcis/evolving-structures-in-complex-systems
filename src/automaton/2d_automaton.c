@@ -15,9 +15,6 @@
 #define KEY_MAX_LENGTH (256)
 #define PERT 1E-15
 
-typedef void (*ProcessF)(uint64_t, size_t size, uint8_t*,
-                         uint8_t[] , uint8_t* , int, int);
-
 typedef struct entrop_state_ph_s
 {
   double entropy;
@@ -89,38 +86,46 @@ void init_automat(size_t size, uint8_t* a, int states)
   }
 }
 
-void update_step_general(uint64_t grule_size, size_t size,
+void update_position_general(size_t i, size_t j,
+                             size_t size,
+                             uint8_t* autom, uint8_t* last_autom,
+                             uint8_t* rule,
+                             int states, int horizon)
+{
+  uint64_t position = 0;
+  uint8_t current_value;
+  int increment = 0;
+
+  for (int k = - horizon; k <= horizon; k++) {
+    for (int l = - horizon; l <= horizon; l++) {
+      current_value = last_autom[((i + k + size) % size) * size
+                           + ((j + l + size) % size)];
+      position += current_value * ipow(states, increment);
+      ++increment;
+    }
+  }
+
+  autom[i * size + j] = rule[position];
+}
+
+void update_step_general(size_t size,
                          uint8_t* A,
-                         uint8_t rule[grule_size],
+                         uint8_t* rule,
                          uint8_t* base, int states,
                          int horizon)
 {
-  uint64_t position;
-  uint8_t current_value;
-  int increment;
-
   for (size_t i = 0; i < size; i++) {
     for (size_t j = 0; j < size; j++) {
-      position = 0;
-      increment = 0;
-      for (int k = - horizon; k <= horizon; k++) {
-        for (int l = - horizon; l <= horizon; l++) {
-          current_value = base[((i + k + size) % size) * size
-                               + ((j + l + size) % size)];
-          position += current_value * ipow(states, increment);
-          ++increment;
-        }
-      }
-
-      A[i * size + j] = rule[position];
+      update_position_general(i, j, size, A, base,
+                              rule, states, horizon);
     }
   }
   memcpy(base, A, size * size * sizeof(uint8_t));
 }
 
-void update_step_totalistic(uint64_t rule_size, size_t size,
+void update_step_totalistic(size_t size,
                             uint8_t* base,
-                            uint8_t rule[rule_size],
+                            uint8_t* rule,
                             uint8_t* A, int states,
                             int horizon)
 {
@@ -329,6 +334,21 @@ void add_nn_results_to_file(FILE* file, network_result_t* res)
   fprintf(file, "%f    %f\n", res->train_error, res->test_error);
 }
 
+void random_noise(size_t size, uint8_t* automaton, int states, double rate)
+{
+  size_t rand_x, rand_y;
+  int pert = (int) (rate * (double) size * (double) size);
+  for (int i = 0; i < pert; ++i) {
+    rand_x = size * ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+    rand_y = size * ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+
+    automaton[(rand_x % size) * size + (rand_y % size)]
+      += (1 + rand() % (states - 1));
+    automaton[(rand_x % size) * size + (rand_y % size)]
+      %= states;
+  }
+}
+
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[],
                   int totalistic, long steps,
@@ -367,8 +387,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   mult_time_file = fopen(mult_time_fname, "w+");
 
 
-  uint8_t* A = (uint8_t*) calloc(size * size, sizeof(uint8_t));
-  uint8_t* base = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+  uint8_t* A = (uint8_t*) malloc(size * size * sizeof(uint8_t));
+  uint8_t* base = (uint8_t*) malloc(size * size * sizeof(uint8_t));
 
   uint8_t* automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
   uint8_t* automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
@@ -385,7 +405,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   char out_string50[(size + 1) * size + 1];
   char out_string10[(size + 1) * size + 1];
   char out_string5[(size + 1) * size + 1];
-  /* int dbl_cmp300, dbl_cmp200, dbl_cmp100, dbl_cmp50, dbl_cmp10, dbl_cmp5; */
+  /* int dbl_cmp300, dbl_cmp200, dbl_cmp100,
+     dbl_cmp50, dbl_cmp10, dbl_cmp5; */
 
   map_t map300 = hashmap_new();
   map_t map50 = hashmap_new();
@@ -399,7 +420,10 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
   for (int i = 0; i < steps; i++) {
 
-    process_function(grule_size, size, base, rule, A, states, opts->horizon);
+    if ((i + 1) % opts->noise_step == 0) {
+      random_noise(size, A, states, opts->noise_rate);
+    }
+    process_function(size, base, rule, A, states, opts->horizon);
 
     if (i % opts->grain == 0) {
       last_compressed_size = compressed_size;
