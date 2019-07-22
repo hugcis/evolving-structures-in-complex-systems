@@ -215,6 +215,20 @@ void generate_general_rule(uint64_t grule_size,
 }
 
 
+void cross_breed(uint64_t grule_size, uint8_t* parent_rule_A,
+                 uint8_t* parent_rule_B, uint8_t* child,
+                 char rule_buf[grule_size], double rate,
+                 int horizon, int states)
+{
+  for (uint64_t i = 0; i < grule_size; ++i) {
+    double rand_num = (double)rand() / (double)((unsigned)RAND_MAX + 1);
+    child[i] = (rate > rand_num) ? parent_rule_A[i]: parent_rule_B[i];
+  }
+
+  perturb_rule(grule_size, child, rule_buf, states, horizon, 0.0005);
+}
+
+
 void perturb_rule(uint64_t grule_size,
                   uint8_t rule_array[grule_size],
                   char rule_buf[grule_size + 1],

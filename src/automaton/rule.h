@@ -19,6 +19,11 @@ void perturb_rule(uint64_t grule_size,
                   char rule_buf[grule_size + 1],
                   int, int, double);
 
+void cross_breed(uint64_t grule_size, uint8_t* parent_rule_A,
+                 uint8_t* parent_rule_B, uint8_t* child,
+                 char rule_buf[grule_size], double rate,
+                 int horizon, int states);
+
 void make_map(struct Options2D*, char*, int);
 
 #endif /* RULE_H */

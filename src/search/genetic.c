@@ -3,7 +3,7 @@
 #include "automaton/2d_automaton.h"
 #include "automaton/rule.h"
 
-#define RATE 0.05
+#define RATE 0.005
 
 typedef struct val_idx_s
 {
@@ -34,9 +34,11 @@ double compute_score(results_nn_t* res)
   }
   /* Everything went well */
   else {
-    return - res->nn_te_300 - res->nn_tr_300;
+    return - res->nn_te_300 - res->nn_tr_300
+      - 10 * (res->nn_tr_300 < .01 ? .1 : 0.);
   }
 }
+
 
 void iterative_search(int n_simulations, int input_flag,
                       long timesteps, uint64_t grule_size,
@@ -94,8 +96,9 @@ void iterative_search(int n_simulations, int input_flag,
 
         memcpy(population[k], rule_array, sizeof(uint8_t) * grule_size);
 
+
         perturb_rule(grule_size, population[k], rule_buf, opts->states,
-                      opts->horizon, RATE);
+                     opts->horizon, 10 * RATE);
 
         /* Allocate space for childrenrules */
         for (int d = 0; d < n_children; ++d) {
@@ -128,11 +131,12 @@ void iterative_search(int n_simulations, int input_flag,
 
       /* Compute results for children */
       for (int d = 0; d < n_children; ++d) {
-        memcpy(children[k * n_children + d], population[k],
-               sizeof(uint8_t) * grule_size);
-        perturb_rule(grule_size, children[k * n_children + d],
-                     rule_buf, opts->states,
-                     opts->horizon, RATE);
+        int rule_A = rand() % population_size;
+        int rule_B = rand() % population_size;
+
+        cross_breed(grule_size, population[rule_A], population[rule_B],
+                    children[k * n_children + d], rule_buf, .5, opts->horizon,
+                    opts->states);
 
         make_map(opts, rule_buf, i);
 
@@ -197,7 +201,9 @@ void iterative_search(int n_simulations, int input_flag,
       memcpy(population[k], tmp_pop[k], sizeof(uint8_t) * grule_size);
 
       populate_buf(grule_size, population[k], rule_buf);
-      fprintf(genealogy_file, "%lu\t", hash(rule_buf));
+      fprintf(genealogy_file, "%lu:%f\t",
+              hash(rule_buf),
+              results[k].value);
     }
     fprintf(genealogy_file, "\n");
     fflush(genealogy_file);
