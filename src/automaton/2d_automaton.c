@@ -436,12 +436,13 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
       print_bits(size, size, A, out_string);
       if (opts->save_flag == TMP_FILE) {
-        asprintf(&step_fname, "rule_gif/tmp_%i.step", i);
+        asprintf(&step_fname, "%s/tmp_%i.step", opts->out_step_dir, i);
       }
       else {
         asprintf(&step_fname, "step_2d_%i/out%s_%i.step",
                  states, rule_buf, i);
       }
+
       out_step_file = fopen(step_fname, "w+");
       free(step_fname);
       fprintf(out_step_file, "%s", out_string);

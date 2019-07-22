@@ -34,9 +34,10 @@ int main_2d(int argc, char** argv)
   opts.save_flag = STEP_FILE;
   opts.joint_complexity = 1;
   opts.early = EARLY;
+  sprintf(opts.out_step_dir, "%s", "rule_gif");
 
   /* Optional arguments processing */
-  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:mw:er")) != -1)
+  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:mw:ero:")) != -1)
     switch (c) {
     case 'r':
       search = 1;
@@ -83,6 +84,9 @@ int main_2d(int argc, char** argv)
       break;
     case 'e':
       opts.early = NO_STOP;
+      break;
+    case 'o':
+      sprintf(opts.out_step_dir, "%s", optarg);
       break;
     case '?':
       err = 1;

@@ -33,11 +33,12 @@ fi
 
 tmpdir=$(mktemp -d)
 
-./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$1.map" -t $TIME -s $SIZE -w $GRAIN -e ||
+./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$1.map" -t $TIME \
+                -s $SIZE -w $GRAIN -e -o $tmpdir ||
     { echo 'Map file not found'; exit 1; }
 
 i=0;
-for fname in `ls rule_gif/*.step | sort -V`; do
+for fname in `ls $tmpdir/*.step | sort -V`; do
     printf "Processing frame: $((i+1)) / $((TIME / GRAIN)) \r";
     ./step_to_ppm $fname $SIZE $STATES \
         | pamtogif > "$tmpdir/tmp_$(printf "%05d" $i).gif" 2>/dev/null \
@@ -47,7 +48,7 @@ echo '\nDone.'
 gifsicle -d $DELAY --loop `ls -v $tmpdir/tmp*.gif` --scale 3 \
          > rule_gif/temp.gif
 
-rm rule_gif/tmp_*.step
+rm $tmpdir/tmp_*.step
 rm -R $tmpdir
 
 # open rule_gif/temp.gif

@@ -25,6 +25,7 @@ struct Options2D {
   int joint_complexity;
   int save_steps;
   enum EarlyStop early;
+  char out_step_dir[200];
 };
 
 typedef struct results_nn_s
