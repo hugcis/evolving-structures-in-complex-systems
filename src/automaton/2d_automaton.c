@@ -15,6 +15,13 @@
 #define KEY_MAX_LENGTH (256)
 #define PERT 1E-15
 
+typedef struct masking_element
+{
+  uint8_t state;
+  size_t pos_x;
+  size_t pos_y;
+} masking_element_t;
+
 typedef struct entrop_state_ph_s
 {
   double entropy;
@@ -86,48 +93,41 @@ void init_automat(size_t size, uint8_t* a, int states)
   }
 }
 
-void update_position_general(size_t i, size_t j,
-                             size_t size,
-                             uint8_t* autom, uint8_t* last_autom,
-                             uint8_t* rule,
-                             int states, int horizon)
-{
-  uint64_t position = 0;
-  uint8_t current_value;
-  int increment = 0;
-
-  for (int k = - horizon; k <= horizon; k++) {
-    for (int l = - horizon; l <= horizon; l++) {
-      current_value = last_autom[((i + k + size) % size) * size
-                           + ((j + l + size) % size)];
-      position += current_value * ipow(states, increment);
-      ++increment;
-    }
-  }
-
-  autom[i * size + j] = rule[position];
-}
 
 void update_step_general(size_t size,
-                         uint8_t* A,
+                         uint8_t* autom,
                          uint8_t* rule,
-                         uint8_t* base, int states,
-                         int horizon)
+                         uint8_t* last_autom, int states,
+                         int horizon,
+                         uint32_t* pows)
 {
+  uint32_t position;
+  uint8_t current_value;
+  int increment;
+
   for (size_t i = 0; i < size; i++) {
     for (size_t j = 0; j < size; j++) {
-      update_position_general(i, j, size, A, base,
-                              rule, states, horizon);
+      position = 0;
+      increment = 0;
+      for (int k = - horizon; k <= horizon; k++) {
+        for (int l = - horizon; l <= horizon; l++) {
+          current_value = last_autom[((i + k + size) % size) * size
+                                     + ((j + l + size) % size)];
+          position += current_value * pows[increment];
+          ++increment;
+        }
+      }
+      autom[i * size + j] = rule[position];
     }
   }
-  memcpy(base, A, size * size * sizeof(uint8_t));
+  memcpy(last_autom, autom, size * size * sizeof(uint8_t));
 }
 
 void update_step_totalistic(size_t size,
                             uint8_t* base,
                             uint8_t* rule,
                             uint8_t* A, int states,
-                            int horizon)
+                            int horizon, uint32_t* pow)
 {
   int count;
   memcpy(A, base, size * size * sizeof(uint8_t));
@@ -390,6 +390,17 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   uint8_t* A = (uint8_t*) malloc(size * size * sizeof(uint8_t));
   uint8_t* base = (uint8_t*) malloc(size * size * sizeof(uint8_t));
 
+  int pert = (int) (opts->noise_rate * (double) size * (double) size);
+  masking_element_t* mask =
+    (masking_element_t*) calloc(pert, sizeof(masking_element_t));
+  for (int i = 0; i < pert; ++i) {
+    mask[i].pos_x = size
+      * ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+    mask[i].pos_y = size
+      * ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+    mask[i].state = rand() % states;
+  }
+
   uint8_t* automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
   uint8_t* automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
   uint8_t* automat300 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
@@ -417,13 +428,19 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   entrop_state_ph_t *res300, *res50, *res5, *res300b, *res50b, *res5b;
 
   int flag = 0;
+  int neigs = (2 * opts->horizon + 1) * (2 * opts->horizon + 1);
 
-  for (int i = 0; i < steps; i++) {
+  uint32_t pows[neigs];
+  for (int i = 0; i < neigs; ++i) {
+    pows[i] = ipow(states, i);
+  }
 
-    if ((i + 1) % opts->noise_step == 0) {
-      random_noise(size, A, states, opts->noise_rate);
-    }
-    process_function(size, base, rule, A, states, opts->horizon);
+  for (int i = 0; i < steps; ++i) {
+
+    /* if ((i + 1) % opts->noise_step == 0) { */
+    /*   random_noise(size, A, states, opts->noise_rate); */
+    /* } */
+    process_function(size, base, rule, A, states, opts->horizon, pows);
 
     if (i % opts->grain == 0) {
       last_compressed_size = compressed_size;

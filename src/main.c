@@ -28,9 +28,9 @@ int main_2d(int argc, char** argv)
   struct Options2D opts;
   opts.size = 256;
   opts.states = 2;
-  opts.grain = 100;
+  opts.grain = 200;
   opts.horizon = 1;
-  opts.grain_write = 100;
+  opts.grain_write = 200;
   opts.save_flag = STEP_FILE;
   opts.joint_complexity = 1;
   opts.early = EARLY;
