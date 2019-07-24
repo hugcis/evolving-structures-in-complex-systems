@@ -11,6 +11,7 @@
 
 enum WriteStepMode { TMP_FILE, STEP_FILE };
 enum EarlyStop { EARLY, NO_STOP };
+enum MaskEnum { MASK, NO_MASK };
 
 /** A set of options to pass for generating and processing an automaton from a
  *  rule.
@@ -28,6 +29,7 @@ struct Options2D {
   char out_step_dir[200];
   int noise_step;
   double noise_rate;
+  enum MaskEnum mask;
 };
 
 typedef struct results_nn_s

@@ -37,9 +37,10 @@ int main_2d(int argc, char** argv)
   sprintf(opts.out_step_dir, "%s", "rule_gif");
   opts.noise_rate = 0.01;
   opts.noise_step = 133;
+  opts.mask = NO_MASK;
 
   /* Optional arguments processing */
-  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:mw:ero:")) != -1)
+  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:mw:ero:q")) != -1)
     switch (c) {
     case 'r':
       search = 1;
@@ -89,6 +90,9 @@ int main_2d(int argc, char** argv)
       break;
     case 'o':
       sprintf(opts.out_step_dir, "%s", optarg);
+      break;
+    case 'q':
+      opts.mask = MASK;
       break;
     case '?':
       err = 1;

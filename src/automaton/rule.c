@@ -225,7 +225,7 @@ void cross_breed(uint64_t grule_size, uint8_t* parent_rule_A,
     child[i] = (rate > rand_num) ? parent_rule_A[i]: parent_rule_B[i];
   }
 
-  perturb_rule(grule_size, child, rule_buf, states, horizon, 0.0005);
+  perturb_rule(grule_size, child, rule_buf, states, horizon, 0.05);
 }
 
 

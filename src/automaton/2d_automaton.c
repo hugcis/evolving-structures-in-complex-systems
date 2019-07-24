@@ -334,6 +334,25 @@ void add_nn_results_to_file(FILE* file, network_result_t* res)
   fprintf(file, "%f    %f\n", res->train_error, res->test_error);
 }
 
+void mask_autom(int pert, size_t size, masking_element_t* mask,
+                uint8_t* automaton)
+{
+  for (int i = 0; i < pert; ++i) {
+    automaton[mask[i].pos_x * size + mask[i].pos_y] = mask[i].state;
+  }
+}
+
+void make_mask(int pert, masking_element_t* mask, size_t size, int states)
+{
+  for (int i = 0; i < pert; ++i) {
+    mask[i].pos_x = size
+      * ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+    mask[i].pos_y = size
+      * ((double)rand() / (double)((unsigned)RAND_MAX + 1));
+    mask[i].state = rand() % states;
+  }
+}
+
 void random_noise(size_t size, uint8_t* automaton, int states, double rate)
 {
   size_t rand_x, rand_y;
@@ -390,16 +409,11 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   uint8_t* A = (uint8_t*) malloc(size * size * sizeof(uint8_t));
   uint8_t* base = (uint8_t*) malloc(size * size * sizeof(uint8_t));
 
+
   int pert = (int) (opts->noise_rate * (double) size * (double) size);
   masking_element_t* mask =
     (masking_element_t*) calloc(pert, sizeof(masking_element_t));
-  for (int i = 0; i < pert; ++i) {
-    mask[i].pos_x = size
-      * ((double)rand() / (double)((unsigned)RAND_MAX + 1));
-    mask[i].pos_y = size
-      * ((double)rand() / (double)((unsigned)RAND_MAX + 1));
-    mask[i].state = rand() % states;
-  }
+
 
   uint8_t* automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
   uint8_t* automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
@@ -440,7 +454,17 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     /* if ((i + 1) % opts->noise_step == 0) { */
     /*   random_noise(size, A, states, opts->noise_rate); */
     /* } */
+    if (i % 20 == 0) {
+      make_mask(pert, mask, size, opts->states);
+    }
+
+    if (opts->mask == MASK) {
+      mask_autom(pert, size, mask, A);
+    }
     process_function(size, base, rule, A, states, opts->horizon, pows);
+    if (opts->mask == MASK) {
+      mask_autom(pert, size, mask, A);
+    }
 
     if (i % opts->grain == 0) {
       last_compressed_size = compressed_size;
@@ -653,6 +677,10 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
   free(fname);
   free(mult_time_fname);
+
+  free(A);
+  free(base);
+  free(mask);
 
   if (entrop_file) {
     free(entrop_fname);
