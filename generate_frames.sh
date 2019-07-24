@@ -5,36 +5,45 @@
 # TODO: add support for options in both the bin/automaton executable and the
 #       python script.
 
-if [ -z $2 ];
-then STATES=3;
-else STATES=$2;
-fi
+STATES=3;
+TIME=1000;
+SIZE=256;
+GRAIN=50;
+DELAY=30;
+Q="";
 
+# A POSIX variable
+OPTIND=1         # Reset in case getopts has been used previously in the shell.
 
-if [ -z $3 ];
-then TIME=1000;
-else TIME=$3;
-fi
+while getopts "h?qd:g:s:t:n:" opt; do
+    case "$opt" in
+        h|\?)
+            show_help
+            exit 0
+            ;;
+        t)  TIME=$OPTARG
+            ;;
+        s)  SIZE=$OPTARG
+            ;;
+        g)  GRAIN=$OPTARG
+            ;;
+        d)  DELAY=$OPTARG
+            ;;
+        q)  Q=-q
+            ;;
+        n)  STATES=$OPTARG
+            ;;
+    esac
+done
 
-if [ -z $4 ];
-then SIZE=256;
-else SIZE=$4;
-fi
+shift $((OPTIND-1))
 
-if [ -z $5 ];
-then GRAIN=50;
-else GRAIN=$5;
-fi
-
-if [ -z $6 ];
-then DELAY=30;
-else DELAY=$6;
-fi
+[ "${1:-}" = "--" ] && shift
 
 tmpdir=$(mktemp -d)
 
-./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$1.map" -t $TIME \
-                -s $SIZE -w $GRAIN -e -o $tmpdir ||
+./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$@.map" -t $TIME \
+                -s $SIZE -w $GRAIN $Q -e -o $tmpdir ||
     { echo 'Map file not found'; exit 1; }
 
 i=0;
@@ -45,6 +54,7 @@ for fname in `ls $tmpdir/*.step | sort -V`; do
         && i=$((i+1));
 done;
 echo '\nDone.'
+
 gifsicle -d $DELAY --loop `ls -v $tmpdir/tmp*.gif` --scale 3 \
          > rule_gif/temp.gif
 
