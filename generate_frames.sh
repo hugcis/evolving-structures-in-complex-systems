@@ -46,17 +46,7 @@ tmpdir=$(mktemp -d)
                 -s $SIZE -w $GRAIN $Q -e -o $tmpdir ||
     { echo 'Map file not found'; exit 1; }
 
-i=0;
-for fname in `ls $tmpdir/*.step | sort -V`; do
-    printf "Processing frame: $((i+1)) / $((TIME / GRAIN)) \r";
-    ./step_to_ppm $fname $SIZE $STATES \
-        | pamtogif > "$tmpdir/tmp_$(printf "%05d" $i).gif" 2>/dev/null \
-        && i=$((i+1));
-done;
-echo '\nDone.'
-
-gifsicle -d $DELAY --loop `ls -v $tmpdir/tmp*.gif` --scale 3 \
-         > rule_gif/temp.gif
+./make_frames.sh $tmpdir $DELAY $SIZE $STATES $TIME $GRAIN
 
 rm $tmpdir/tmp_*.step
 rm -R $tmpdir
