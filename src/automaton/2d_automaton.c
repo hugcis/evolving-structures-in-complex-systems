@@ -379,7 +379,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   FILE* out_file = NULL;
   char* fname;
 
-  FILE* mult_time_file;
+  FILE* mult_time_file = NULL;
   char* mult_time_fname;
 
   FILE* entrop_file = NULL;
@@ -675,8 +675,15 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   free(automat50);
   free(automat300);
 
-  free(fname);
-  free(mult_time_fname);
+  if (fname) {
+    free(fname);
+    fclose(out_file);
+  }
+
+  if (mult_time_file) {
+    free(mult_time_fname);
+    fclose(mult_time_file);
+  }
 
   free(A);
   free(base);

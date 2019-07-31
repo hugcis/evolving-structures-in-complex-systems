@@ -254,13 +254,18 @@ void make_map(struct Options2D* opts, char* rule_buf, int step)
 
   asprintf(&fname, "data_2d_%i/map/%lu.map", opts->states, hash(rule_buf));
   dic_file = fopen(fname, "w+");
+
+  if (dic_file == NULL) {
+    fprintf(stderr, "Error while opening map file %s.", fname);
+    exit(1);
+  }
+
   fprintf(dic_file, "%s", rule_buf);
   fclose(dic_file);
   free(fname);
 
   sprintf(rule_buf, "%lu", hash(rule_buf));
   printf("%i: Rule %s\n", step, rule_buf);
-
 }
 
 void generate_totalistic_rule(uint64_t rule_size, uint8_t rule_array[rule_size],

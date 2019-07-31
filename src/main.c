@@ -117,7 +117,7 @@ int main_2d(int argc, char** argv)
   uint8_t* rule_array = malloc(grule_size * sizeof(uint8_t));
 
 
-  /* If input was given, it was either directly or via a file */
+  /* If input was given, it was either directly inline or via a file */
   if (input_fname) {
     FILE* rule_file;
     if ((rule_file = fopen(input_fname, "r"))) {
@@ -129,12 +129,12 @@ int main_2d(int argc, char** argv)
       }
       rule_buf[count] = '\0';
       if (count != grule_size) {
-        fprintf(stderr, "Incorrect rule in file %s", input_fname);
+        fprintf(stderr, "Incorrect rule in file %s\n", input_fname);
         exit(1);
       }
     }
     else {
-      fprintf(stderr, "Error while opening file %s", input_fname);
+      fprintf(stderr, "Error while opening file %s\n", input_fname);
       exit(1);
     }
     free(input_fname);
@@ -145,7 +145,6 @@ int main_2d(int argc, char** argv)
                          opts.states);
     free(input_rule);
   }
-
 
   /* If input rule was provided, and not starting a search: write steps for a
      given rule  */
