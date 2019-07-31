@@ -12,6 +12,7 @@
 enum WriteStepMode { TMP_FILE, STEP_FILE };
 enum EarlyStop { EARLY, NO_STOP };
 enum MaskEnum { MASK, NO_MASK };
+enum DataOutput { OUTPUT, NO_OUTPUT };
 
 /** A set of options to pass for generating and processing an automaton from a
  *  rule.
@@ -19,17 +20,20 @@ enum MaskEnum { MASK, NO_MASK };
 struct Options2D {
   size_t size; /**< The size of the square grid. */
   int grain_write; /**< The grain at which write operations are executed. */
-  int grain;
-  enum WriteStepMode save_flag;
+  int grain; /**< The grain at which compression is done. */
+  enum WriteStepMode save_flag; /**< Wether to write output to a temporary
+                                   file or step file */
+  char out_step_dir[200]; /**< Output dir for the temporary file */
   int states;
   int horizon;
   int joint_complexity;
   int save_steps;
   enum EarlyStop early;
-  char out_step_dir[200];
   int noise_step;
   double noise_rate;
   enum MaskEnum mask;
+  enum DataOutput output_data; /**< Wether to compute metrics on the
+                                  simulations */
 };
 
 typedef struct results_nn_s

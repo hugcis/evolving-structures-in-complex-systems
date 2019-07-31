@@ -402,10 +402,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   asprintf(&fname, "data_2d_%i/out/out%s.dat", states, rule_buf);
   out_file = fopen(fname, "w+");
 
-  asprintf(&mult_time_fname, "data_2d_%i/mult/mult%s.dat", states, rule_buf);
-  mult_time_file = fopen(mult_time_fname, "w+");
-
-
   uint8_t* A = (uint8_t*) malloc(size * size * sizeof(uint8_t));
   uint8_t* base = (uint8_t*) malloc(size * size * sizeof(uint8_t));
 
@@ -430,8 +426,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   char out_string50[(size + 1) * size + 1];
   char out_string10[(size + 1) * size + 1];
   char out_string5[(size + 1) * size + 1];
-  /* int dbl_cmp300, dbl_cmp200, dbl_cmp100,
-     dbl_cmp50, dbl_cmp10, dbl_cmp5; */
+  int dbl_cmp300, dbl_cmp200, dbl_cmp100,
+      dbl_cmp50, dbl_cmp10, dbl_cmp5;
 
   map_t map300 = hashmap_new();
   map_t map50 = hashmap_new();
@@ -464,6 +460,33 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     process_function(size, base, rule, A, states, opts->horizon, pows);
     if (opts->mask == MASK) {
       mask_autom(pert, size, mask, A);
+    }
+
+    /* Save steps every grain_write */
+    if (opts->grain_write > 0
+        && i % opts->grain_write == 0
+        && opts->save_steps == 1) {
+
+      FILE* out_step_file;
+      char* step_fname;
+
+      print_bits(size, size, A, out_string);
+      if (opts->save_flag == TMP_FILE) {
+        asprintf(&step_fname, "%s/tmp_%i.step", opts->out_step_dir, i);
+      }
+      else {
+        asprintf(&step_fname, "data_2d_%i/steps/out%s_%i.step",
+                 states, rule_buf, i);
+      }
+
+      out_step_file = fopen(step_fname, "w+");
+      free(step_fname);
+      fprintf(out_step_file, "%s", out_string);
+      fclose(out_step_file);
+    }
+
+    if (opts -> output_data == NO_OUTPUT) {
+      continue;
     }
 
     if (i % opts->grain == 0) {
@@ -510,31 +533,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
       printf("%i  ", compressed_size);
       fflush(stdout);
-
     }
 
-    /* Save steps every grain_write */
-    if (opts->grain_write > 0
-        && i % opts->grain_write == 0
-        && opts->save_steps == 1) {
-
-      FILE* out_step_file;
-      char* step_fname;
-
-      print_bits(size, size, A, out_string);
-      if (opts->save_flag == TMP_FILE) {
-        asprintf(&step_fname, "%s/tmp_%i.step", opts->out_step_dir, i);
-      }
-      else {
-        asprintf(&step_fname, "step_2d_%i/out%s_%i.step",
-                 states, rule_buf, i);
-      }
-
-      out_step_file = fopen(step_fname, "w+");
-      free(step_fname);
-      fprintf(out_step_file, "%s", out_string);
-      fclose(out_step_file);
-    }
 
     int offset_a = 2, offset_b = 1;
 
@@ -569,46 +569,49 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       memcpy(automat5, A, size * size * sizeof(uint8_t));
     }
     if (i == steps - 1) {
-      /* print_bits(size, size, A, out_string); */
-      /* memcpy(&dbl_pholder[(size + 1) * size + 1], */
-      /*        out_string, (size + 1) * size + 1); */
+      asprintf(&mult_time_fname, "data_2d_%i/mult/mult%s.dat", states, rule_buf);
+      mult_time_file = fopen(mult_time_fname, "w+");
 
-      /* memcpy(dbl_pholder, out_string300, (size + 1) * size + 1); */
-      /* dbl_cmp300 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string200, (size + 1) * size + 1); */
-      /* dbl_cmp200 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string100, (size + 1) * size + 1); */
-      /* dbl_cmp100 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string50, (size + 1) * size + 1); */
-      /* dbl_cmp50 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string10, (size + 1) * size + 1); */
-      /* dbl_cmp10 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string5, (size + 1) * size + 1); */
-      /* dbl_cmp5 = compress_memory_size(dbl_pholder, */
-      /*                                  2 * ((size + 1) * size + 1)); */
+      print_bits(size, size, A, out_string);
+      memcpy(&dbl_pholder[(size + 1) * size + 1],
+             out_string, (size + 1) * size + 1);
 
-      /* fprintf(mult_time_file, "%i    %i    %i    %i    " */
-      /*                         "%i    %i    %i    %i    " */
-      /*                         "%i    %i    %i    %i    " */
-      /*                         "%i\n", */
-      /*         compress_memory_size(out_string, (size + 1) * size), */
-      /*         dbl_cmp5, */
-      /*         compress_memory_size(out_string5, (size + 1) * size), */
-      /*         dbl_cmp10, */
-      /*         compress_memory_size(out_string10, (size + 1) * size), */
-      /*         dbl_cmp50, */
-      /*         compress_memory_size(out_string50, (size + 1) * size), */
-      /*         dbl_cmp100, */
-      /*         compress_memory_size(out_string100, (size + 1) * size), */
-      /*         dbl_cmp200, */
-      /*         compress_memory_size(out_string200, (size + 1) * size), */
-      /*         dbl_cmp300, */
-      /*         compress_memory_size(out_string300, (size + 1) * size)); */
+      memcpy(dbl_pholder, out_string300, (size + 1) * size + 1);
+      dbl_cmp300 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string200, (size + 1) * size + 1);
+      dbl_cmp200 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string100, (size + 1) * size + 1);
+      dbl_cmp100 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string50, (size + 1) * size + 1);
+      dbl_cmp50 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string10, (size + 1) * size + 1);
+      dbl_cmp10 = compress_memory_size(dbl_pholder,
+                                        2 * ((size + 1) * size + 1));
+      memcpy(dbl_pholder, out_string5, (size + 1) * size + 1);
+      dbl_cmp5 = compress_memory_size(dbl_pholder,
+                                       2 * ((size + 1) * size + 1));
+
+      fprintf(mult_time_file, "%i    %i    %i    %i    "
+                              "%i    %i    %i    %i    "
+                              "%i    %i    %i    %i    "
+                              "%i\n",
+              compress_memory_size(out_string, (size + 1) * size),
+              dbl_cmp5,
+              compress_memory_size(out_string5, (size + 1) * size),
+              dbl_cmp10,
+              compress_memory_size(out_string10, (size + 1) * size),
+              dbl_cmp50,
+              compress_memory_size(out_string50, (size + 1) * size),
+              dbl_cmp100,
+              compress_memory_size(out_string100, (size + 1) * size),
+              dbl_cmp200,
+              compress_memory_size(out_string200, (size + 1) * size),
+              dbl_cmp300,
+              compress_memory_size(out_string300, (size + 1) * size));
 
       asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
       entrop_file = fopen(entrop_fname, "w+");
@@ -636,10 +639,14 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
       network_result_t res = {1.};
       network_opts_t n_opts = {10, 30, 3};
-      train_nn_on_automaton(size, states, automat300, A, &n_opts, &res);
-      add_nn_results_to_file(nn_file, &res);
-      results->nn_tr_300 = res.train_error;
-      results->nn_te_300 = res.test_error;
+      for (int i = 1; i < 8; ++i) {
+        n_opts.offset = i;
+        train_nn_on_automaton(size, states, automat300, A, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &res);
+      }
+
+      /* results->nn_tr_300 = res.train_error; */
+      /* results->nn_te_300 = res.test_error; */
 
       /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
       /* add_nn_results_to_file(nn_file, &res); */
@@ -697,7 +704,4 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     free(nn_fname);
     fclose(nn_file);
   }
-  fclose(mult_time_file);
-  fclose(out_file);
 }
-
