@@ -4,10 +4,11 @@
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_rng.h>
 #include "utils/utils.h"
+#include "utils/compress.h"
 #include "rule.h"
 
 #define DIRICHLET 1
-#define D_CONST 0.8
+#define D_CONST 0.3
 
 void populate_buf(uint64_t grule_size, uint8_t* rule_array, char* rule_buf)
 {
