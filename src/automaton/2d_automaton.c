@@ -12,6 +12,12 @@
 #include "utils/utils.h"
 #include "utils/hashmap.h"
 
+#if PROFILE
+#define PROF(x) {clock_t t1=clock();x;clock_t t2=clock();t += t2 - t1;printf("\rLoop per second %g ", ((double) i / ((double) t * 1E-6)));}
+#else
+#define PROF(x) x;
+#endif
+
 #define KEY_MAX_LENGTH (256)
 #define PERT 1E-15
 
@@ -80,14 +86,20 @@ void init_automat(size_t size, uint8_t* a, int states)
   assert(size > 20);
   for (size_t i = 0; i < size; i++) {
     for (size_t j = 0; j < size; j++) {
-      /* Initialize center 20x20 square to random */
-      if ((i >= size/2 - 10) && (i < size/2 + 10) &&
-          (j >= size/2 - 10) && (j < size/2 + 10)) {
+      /* Very small automata: initialize at random */
+      if (size <= 20) {
         a[(i % size) * size + (j % size)] = (uint8_t)(rand() % states);
       }
-      /* Rest is 0 */
       else {
-        a[i * size + j] = (uint8_t)0;
+        /* Initialize center 20x20 square to random */
+        if ((i >= size/2 - 10) && (i < size/2 + 10) &&
+            (j >= size/2 - 10) && (j < size/2 + 10)) {
+          a[(i % size) * size + (j % size)] = (uint8_t)(rand() % states);
+        }
+        /* Rest is 0 */
+        else {
+          a[i * size + j] = (uint8_t)0;
+        }
       }
     }
   }
@@ -105,14 +117,14 @@ void update_step_general(size_t size,
   uint8_t current_value;
   int increment;
 
-  for (size_t i = 0; i < size; i++) {
-    for (size_t j = 0; j < size; j++) {
+  for (size_t i = horizon; i < size - horizon; i++) {
+    for (size_t j = horizon; j < size - horizon; j++) {
       position = 0;
       increment = 0;
       for (int k = - horizon; k <= horizon; k++) {
         for (int l = - horizon; l <= horizon; l++) {
-          current_value = last_autom[((i + k + size) % size) * size
-                                     + ((j + l + size) % size)];
+          current_value = last_autom[(i + k) * size
+                                     + (j + l)];
           position += current_value * pows[increment];
           ++increment;
         }
@@ -120,7 +132,59 @@ void update_step_general(size_t size,
       autom[i * size + j] = rule[position];
     }
   }
-  memcpy(last_autom, autom, size * size * sizeof(uint8_t));
+
+  /* Deal with boundary conditions separately */
+  for (size_t j = 0; j < size; ++j) {
+    position = 0;
+    increment = 0;
+    for (int k = - horizon; k <= horizon; k++) {
+      for (int l = - horizon; l <= horizon; l++) {
+        current_value = last_autom[((k + size) % size) * size
+                                   + ((j + l + size) % size)];
+        position += current_value * pows[increment];
+        ++increment;
+      }
+    }
+    autom[j] = rule[position];
+
+    position = 0;
+    increment = 0;
+    for (int k = - horizon; k <= horizon; k++) {
+      for (int l = - horizon; l <= horizon; l++) {
+        current_value = last_autom[((size - 1 + k + size) % size) * size
+                                   + ((j + l + size) % size)];
+        position += current_value * pows[increment];
+        ++increment;
+      }
+    }
+    autom[(size - 1) * size + j] = rule[position];
+  }
+
+  for (size_t i = 0; i < size; ++i) {
+    position = 0;
+    increment = 0;
+    for (int k = - horizon; k <= horizon; k++) {
+      for (int l = - horizon; l <= horizon; l++) {
+        current_value = last_autom[((i + k + size) % size) * size
+                                   + ((l + size) % size)];
+        position += current_value * pows[increment];
+        ++increment;
+      }
+    }
+    autom[i * size] = rule[position];
+
+    position = 0;
+    increment = 0;
+    for (int k = - horizon; k <= horizon; k++) {
+      for (int l = - horizon; l <= horizon; l++) {
+        current_value = last_autom[((i + k + size) % size) * size
+                                   + ((size - 1 + l + size) % size)];
+        position += current_value * pows[increment];
+        ++increment;
+      }
+    }
+    autom[i * size + size - 1] = rule[position];
+  }
 }
 
 void update_step_totalistic(size_t size,
@@ -402,21 +466,26 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   asprintf(&fname, "data_2d_%i/out/out%s.dat", states, rule_buf);
   out_file = fopen(fname, "w+");
 
-  uint8_t* A = (uint8_t*) malloc(size * size * sizeof(uint8_t));
-  uint8_t* base = (uint8_t*) malloc(size * size * sizeof(uint8_t));
-
+  uint8_t* (*frame1) = malloc(sizeof(uint8_t* (*)));
+  *frame1 = (uint8_t*) malloc(size * size * sizeof(uint8_t));
+  uint8_t* (*frame2) = malloc(sizeof(uint8_t* (*)));
+  *frame2 = (uint8_t*) malloc(size * size * sizeof(uint8_t));
+  uint8_t* (*temp_frame);
 
   int pert = (int) (opts->noise_rate * (double) size * (double) size);
-  masking_element_t* mask =
-    (masking_element_t*) calloc(pert, sizeof(masking_element_t));
+
+  masking_element_t* mask = NULL;
+  if (opts->mask == MASK) {
+      mask = (masking_element_t*) calloc(pert, sizeof(masking_element_t));
+  }
 
 
   uint8_t* automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
   uint8_t* automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
   uint8_t* automat300 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
 
-  init_automat(size, A, states);
-  memcpy(base, A, size * size * sizeof(uint8_t));
+  init_automat(size, *frame1, states);
+  memcpy(*frame2, *frame1, size * size * sizeof(uint8_t));
 
   char dbl_pholder[2 * ((size + 1) * size + 1)];
   char out_string[(size + 1) * size + 1];
@@ -439,6 +508,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
   int flag = 0;
   int neigs = (2 * opts->horizon + 1) * (2 * opts->horizon + 1);
+  #if PROFILE
+  clock_t t = 0;
+  #endif
 
   uint32_t pows[neigs];
   for (int i = 0; i < neigs; ++i) {
@@ -448,18 +520,27 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   for (int i = 0; i < steps; ++i) {
 
     /* if ((i + 1) % opts->noise_step == 0) { */
-    /*   random_noise(size, A, states, opts->noise_rate); */
+    /*   random_noise(size, frame1, states, opts->noise_rate); */
     /* } */
-    if (i % 20 == 0) {
+    if (i % 20 == 0 && opts->mask == MASK) {
       make_mask(pert, mask, size, opts->states);
     }
 
     if (opts->mask == MASK) {
-      mask_autom(pert, size, mask, A);
+      mask_autom(pert, size, mask, *frame1);
     }
-    process_function(size, base, rule, A, states, opts->horizon, pows);
+    /* Make update from frame1 to frame2 */
+
+    PROF(
+    process_function(size, *frame2, rule, *frame1, states, opts->horizon, pows);
+    /* Swap pointers */
+    temp_frame = frame1;
+    frame1 = frame2;
+    frame2 = temp_frame;
+    )
+
     if (opts->mask == MASK) {
-      mask_autom(pert, size, mask, A);
+      mask_autom(pert, size, mask, *frame1);
     }
 
     /* Save steps every grain_write */
@@ -470,7 +551,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       FILE* out_step_file;
       char* step_fname;
 
-      print_bits(size, size, A, out_string);
+      print_bits(size, size, *frame1, out_string);
       if (opts->save_flag == TMP_FILE) {
         asprintf(&step_fname, "%s/tmp_%i.step", opts->out_step_dir, i);
       }
@@ -485,6 +566,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       fclose(out_step_file);
     }
 
+
     if (opts -> output_data == NO_OUTPUT) {
       continue;
     }
@@ -493,9 +575,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       last_compressed_size = compressed_size;
       last_cell_count = cell_count;
 
-      print_bits(size, size, A, out_string);
+      print_bits(size, size, *frame1, out_string);
       compressed_size = compress_memory_size(out_string, (size + 1) * size);
-      cell_count = count_cells(size, A, states);
+      cell_count = count_cells(size, *frame1, states);
 
       /* Check if state has evolved from last time (stop mechanism) */
       if (compressed_size == last_compressed_size
@@ -535,44 +617,43 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       fflush(stdout);
     }
 
-
     int offset_a = 2, offset_b = 1;
 
     if (i == steps - 301) {
-      print_bits(size, size, A, out_string300);
-      res300 = populate_map(map300, size, A, offset_a, states);
-      res300b = populate_map(map300b, size, A, offset_b, states);
+      print_bits(size, size, *frame1, out_string300);
+      res300 = populate_map(map300, size, *frame1, offset_a, states);
+      res300b = populate_map(map300b, size, *frame1, offset_b, states);
 
-      memcpy(automat300, A, size * size * sizeof(uint8_t));
+      memcpy(automat300, *frame1, size * size * sizeof(uint8_t));
     }
     if (i == steps - 200) {
-      print_bits(size, size, A, out_string200);
+      print_bits(size, size, *frame1, out_string200);
     }
     if (i == steps - 100) {
-      print_bits(size, size, A, out_string100);
+      print_bits(size, size, *frame1, out_string100);
     }
     if (i == steps - 51) {
-      print_bits(size, size, A, out_string50);
-      res50 = populate_map(map50, size, A, offset_a, states);
-      res50b = populate_map(map50b, size, A, offset_b, states);
+      print_bits(size, size, *frame1, out_string50);
+      res50 = populate_map(map50, size, *frame1, offset_a, states);
+      res50b = populate_map(map50b, size, *frame1, offset_b, states);
 
-      memcpy(automat50, A, size * size * sizeof(uint8_t));
+      memcpy(automat50, *frame1, size * size * sizeof(uint8_t));
     }
     if (i == steps - 10) {
-      print_bits(size, size, A, out_string10);
+      print_bits(size, size, *frame1, out_string10);
     }
     if (i == steps - 5) {
-      print_bits(size, size, A, out_string5);
-      res5 = populate_map(map5, size, A, offset_a, states);
-      res5b = populate_map(map5b, size, A, offset_b, states);
+      print_bits(size, size, *frame1, out_string5);
+      res5 = populate_map(map5, size, *frame1, offset_a, states);
+      res5b = populate_map(map5b, size, *frame1, offset_b, states);
 
-      memcpy(automat5, A, size * size * sizeof(uint8_t));
+      memcpy(automat5, *frame1, size * size * sizeof(uint8_t));
     }
     if (i == steps - 1) {
       asprintf(&mult_time_fname, "data_2d_%i/mult/mult%s.dat", states, rule_buf);
       mult_time_file = fopen(mult_time_fname, "w+");
 
-      print_bits(size, size, A, out_string);
+      print_bits(size, size, *frame1, out_string);
       memcpy(&dbl_pholder[(size + 1) * size + 1],
              out_string, (size + 1) * size + 1);
 
@@ -616,20 +697,20 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
       entrop_file = fopen(entrop_fname, "w+");
 
-      add_results_to_file(map300, size, A, states, offset_a,
+      add_results_to_file(map300, size, *frame1, states, offset_a,
                           entrop_file, res300);
-      add_results_to_file(map50, size, A, states, offset_a,
+      add_results_to_file(map50, size, *frame1, states, offset_a,
                           entrop_file, res50);
-      add_results_to_file(map5, size, A, states, offset_a,
+      add_results_to_file(map5, size, *frame1, states, offset_a,
                           entrop_file, res5);
       fprintf(entrop_file, "\n");
 
 
-      add_results_to_file(map300b, size, A, states, offset_b,
+      add_results_to_file(map300b, size, *frame1, states, offset_b,
                           entrop_file, res300b);
-      add_results_to_file(map50b, size, A, states, offset_b,
+      add_results_to_file(map50b, size, *frame1, states, offset_b,
                           entrop_file, res50b);
-      add_results_to_file(map5b, size, A, states, offset_b,
+      add_results_to_file(map5b, size, *frame1, states, offset_b,
                           entrop_file, res5b);
       fprintf(entrop_file, "\n");
 
@@ -638,32 +719,37 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       nn_file = fopen(nn_fname, "w+");
 
       network_result_t res = {1.};
-      network_opts_t n_opts = {10, 30, 3};
-      for (int i = 1; i < 8; ++i) {
+      network_opts_t n_opts = {10, 30, 1, MOMENTUM, NO_DECAY};
+      for (int i = 3; i < 4; ++i) {
         n_opts.offset = i;
-        train_nn_on_automaton(size, states, automat300, A, &n_opts, &res);
+        n_opts.decay = NO_DECAY;
+        train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
         add_nn_results_to_file(nn_file, &res);
+
+        /* n_opts.decay = DECAY; */
+        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+        /* add_nn_results_to_file(nn_file, &res); */
       }
 
       /* results->nn_tr_300 = res.train_error; */
       /* results->nn_te_300 = res.test_error; */
 
-      /* train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
+      /* train_nn_on_automaton(size, states, automat50, *frame1, &n_opts, &res); */
       /* add_nn_results_to_file(nn_file, &res); */
       /* results->nn_tr_50 = res.train_error; */
       /* results->nn_te_50 = res.test_error; */
 
-      /* train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
+      /* train_nn_on_automaton(size, states, automat5, *frame1, &n_opts, &res); */
       /* add_nn_results_to_file(nn_file, &res); */
       /* results->nn_tr_5 = res.train_error; */
       /* results->nn_te_5 = res.test_error; */
 
     /*   n_opts.offset = 1; */
-    /*   train_nn_on_automaton(size, states, automat300, A, &n_opts, &res); */
+    /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
     /*   add_nn_results_to_file(nn_file, &res); */
-    /*   train_nn_on_automaton(size, states, automat50, A, &n_opts, &res); */
+    /*   train_nn_on_automaton(size, states, automat50, *frame1, &n_opts, &res); */
     /*   add_nn_results_to_file(nn_file, &res); */
-    /*   train_nn_on_automaton(size, states, automat5, A, &n_opts, &res); */
+    /*   train_nn_on_automaton(size, states, automat5, *frame1, &n_opts, &res); */
     /*   add_nn_results_to_file(nn_file, &res); */
 
     }
@@ -692,8 +778,10 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     fclose(mult_time_file);
   }
 
-  free(A);
-  free(base);
+  free(*frame1);
+  free(frame1);
+  free(*frame2);
+  free(frame2);
   free(mask);
 
   if (entrop_file) {
