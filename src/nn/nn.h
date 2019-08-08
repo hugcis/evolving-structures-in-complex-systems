@@ -2,11 +2,16 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+enum OptimType { MOMENTUM, ADAM, NESTEROV, SGD };
+enum LRDecay { NO_DECAY, DECAY };
+
 typedef struct network_opts_s
 {
   int num_hid;
   int max_epoch;
   int offset;
+  enum OptimType optim_type;
+  enum LRDecay decay;
 } network_opts_t;
 
 typedef struct network_result_s
@@ -15,7 +20,9 @@ typedef struct network_result_s
   double test_error;
 } network_result_t;
 
-void train_nn_on_automaton(size_t size, int, uint8_t*,
+void train_nn_on_automaton(size_t, int,
+                           uint8_t*,
                            uint8_t*,
                            network_opts_t*,
                            network_result_t*);
+

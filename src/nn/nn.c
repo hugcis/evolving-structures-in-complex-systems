@@ -166,6 +166,7 @@ void forward(double* input, double* output,
 }
 
 void update_weights(int num_input, int num_hidden, int num_output,
+                    double eta,
                     double* batch_error, double reg, double alpha,
                     double* weight_ih, double* delta_w_ih,
                     double* delta_w_ih_prev,
@@ -176,79 +177,93 @@ void update_weights(int num_input, int num_hidden, int num_output,
   /* Update weights with average gradient */
   for (i = 0; i < num_input + 1; ++i) {
     for (j = 0; j < num_hidden; ++j) {
-      *batch_error += 0.5 * reg *
-        weight_ih[i * num_hidden + j] * weight_ih[i * num_hidden + j] ;
+      if (reg > 0) {
+        *batch_error += 0.5 * reg *
+          weight_ih[i * num_hidden + j] * weight_ih[i * num_hidden + j] ;
+        weight_ih[i * num_hidden + j] += (1 + alpha) *
+          reg * weight_ih[i * num_hidden + j];
+      }
+
       weight_ih[i * num_hidden + j] += (1 + alpha) *
-        (delta_w_ih[i * num_hidden + j] +
-         reg * weight_ih[i * num_hidden + j]);
-      weight_ih[i * num_hidden + j] += (-alpha) *
-        delta_w_ih_prev[i * num_hidden + j];
+        ( - eta * delta_w_ih[i * num_hidden + j]);
+
+      if (alpha > 0.) {
+        weight_ih[i * num_hidden + j] += (-alpha) *
+          delta_w_ih_prev[i * num_hidden + j];
+      }
     }
   }
   for (j = 0; j < num_hidden + 1; ++j) {
     for (k = 0; k < num_output; ++k) {
-      *batch_error += 0.5 * reg *
-        weight_ho[j * num_output + k] * weight_ho[j * num_output + k];
+      if (reg > 0) {
+        *batch_error += 0.5 * reg *
+          weight_ho[j * num_output + k] * weight_ho[j * num_output + k];
+        weight_ho[j * num_output + k] += (1 + alpha) *
+        reg * weight_ho[j * num_output + k];
+      }
+
       weight_ho[j * num_output + k] += (1 + alpha) *
-        (delta_w_ho[j * num_output + k] +
-         reg * weight_ho[j * num_output + k]);
-      weight_ho[j * num_output + k] += (-alpha) *
-        delta_w_ho_prev[j * num_output + k];
+        ( - eta * delta_w_ho[j * num_output + k]);
+
+      if (alpha > 0.) {
+        weight_ho[j * num_output + k] += (-alpha) *
+          delta_w_ho_prev[j * num_output + k];
+      }
     }
   }
 }
 
 void compute_batch_gradients(int base_index, double alpha,
                              int batch_size, int num_input, int num_output,
-                             int num_hidden, size_t* random_idx, double eta,
-                             double* batch_error, double* output,
+                             int num_hidden, size_t* random_idx,
+                             double* output,
                              uint8_t* target, double* delta_output,
                              double* delta_w_ho, double* hidden_bias,
                              double* weight_ho, double* delta_h,
                              double* delta_w_ih, double* input,
                              double* delta_w_ih_prev,
-                             double* delta_w_ho_prev)
+                             double* delta_w_ho_prev,
+                             network_opts_t* opts)
 {
   int i, j, k, p;
 
   /* Gradient initialization (Nesterov momentum) */
-  memcpy(delta_w_ih_prev, delta_w_ih,
-         sizeof(double) * num_hidden * (num_input + 1));
-  for (i = 0; i < num_input + 1; ++i) {
-    for (j = 0; j < num_hidden; ++j) {
-      delta_w_ih[i * num_hidden + j] *= alpha;
+  if (opts->optim_type == NESTEROV) {
+    memcpy(delta_w_ih_prev, delta_w_ih,
+           sizeof(double) * num_hidden * (num_input + 1));
+    for (i = 0; i < num_input + 1; ++i) {
+      for (j = 0; j < num_hidden; ++j) {
+        delta_w_ih[i * num_hidden + j] *= alpha;
+      }
     }
-  }
 
-  memcpy(delta_w_ho_prev, delta_w_ho,
-         sizeof(double) * num_output * (num_hidden + 1));
-  for (j = 0; j < num_hidden + 1; ++j) {
-    for (k = 0; k < num_output; ++k) {
-      delta_w_ho[j * num_output + k] *= alpha;
+    memcpy(delta_w_ho_prev, delta_w_ho,
+           sizeof(double) * num_output * (num_hidden + 1));
+    for (j = 0; j < num_hidden + 1; ++j) {
+      for (k = 0; k < num_output; ++k) {
+        delta_w_ho[j * num_output + k] *= alpha;
+      }
     }
   }
 
   for (int b = 0; b < batch_size; ++b) {
     p = random_idx[(base_index + b)];
-    /* Compute loss */
-    *batch_error +=
-      - log((output[b * num_output + target[p]] > 0) ?
-            output[b * num_output + target[p]]: DBL_MIN);
 
     /* Backpropagation */
     for (k = 0; k < num_output; ++k) {
       /* Output gradients */
       delta_output[b * num_output + k] =
-        (output[b * num_output + k] - ((k == target[p])? 1.0: 0.0))
-        / (double) batch_size;
+        (output[b * num_output + k] - ((k == target[p])? 1.0: 0.0));
+      delta_output[b * num_output + k] /= (double) batch_size;
     }
   }
 
   cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
               num_hidden + 1, num_output, batch_size,
-              - eta , hidden_bias, num_hidden + 1,
+              1 , hidden_bias, num_hidden + 1,
               delta_output, num_output,
-              1.0, delta_w_ho, num_output);
+              (opts->optim_type == NESTEROV)? 1.0: 0.0,
+              delta_w_ho, num_output);
 
   /* Dot product weight_ho x delta_output (we don't count the bias in
      weight_ho)*/
@@ -268,13 +283,30 @@ void compute_batch_gradients(int base_index, double alpha,
 
   cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
               num_input + 1, num_hidden, batch_size,
-              - eta , input, num_input + 1,
+              1 , input, num_input + 1,
               delta_h, num_hidden,
-              1.0, delta_w_ih, num_hidden);
+              (opts->optim_type == NESTEROV)? 1.0: 0.0,
+              delta_w_ih, num_hidden);
 
-  *batch_error /= batch_size;
 }
 
+double compute_loss(int base_index, int batch_size,
+                    size_t* random_idx,
+                    int num_output, double* output,
+                    uint8_t* target)
+{
+  double batch_error = 0.0;
+  int p;
+  for (int b = 0; b < batch_size; ++b) {
+    p = random_idx[(base_index + b)];
+    /* Compute loss */
+    batch_error +=
+      - log((output[b * num_output + target[p]] > 0) ?
+            output[b * num_output + target[p]]: DBL_MIN);
+  }
+  batch_error /= (double) batch_size;
+  return batch_error;
+}
 
 double compute_test_error(int num_pattern, int num_output, int num_hidden,
                           int num_input,
@@ -317,8 +349,12 @@ void train_nn_on_automaton(size_t size, int states,
   int num_hidden = opts->num_hid;
   int num_output = states;
 
-  double batch_error, error, eta = 0.01, alpha = 0.9;
-  int batch_size = 8;
+  double batch_error, error, eta = 1., alpha = 0.9;
+  if (opts->optim_type != NESTEROV) {
+    alpha = 0.;
+  }
+
+  int batch_size = 64;
   /* Regression parameter */
   double reg = 0.0;
 
@@ -349,10 +385,12 @@ void train_nn_on_automaton(size_t size, int states,
     calloc((num_input + 1) * num_hidden, sizeof(double));
   double* delta_w_ho =
     calloc((num_hidden + 1) * num_output, sizeof(double));
-  double* delta_w_ih_prev =
-    malloc(sizeof(double) * (num_input + 1) * num_hidden);
-  double* delta_w_ho_prev =
-    malloc(sizeof(double) * (num_hidden + 1) * num_output);
+  double* delta_w_ih_prev = NULL;
+  double* delta_w_ho_prev = NULL;
+  if (opts->optim_type == NESTEROV) {
+    delta_w_ih_prev = malloc(sizeof(double) * (num_input + 1) * num_hidden);
+    delta_w_ho_prev =  malloc(sizeof(double) * (num_hidden + 1) * num_output);
+  }
 
   /* Allocate the arrays that will hold data for each batch */
   double* input =
@@ -377,9 +415,9 @@ void train_nn_on_automaton(size_t size, int states,
     error = 0.0;
 
     /* Learning rate decay */
-    /* if (epoch > 0 && epoch%3 == 0) { */
-      /* eta -= eta/2; */
-    /* } */
+    if (epoch > 0 && epoch%5 == 0 && opts->decay == DECAY) {
+      eta -= .5 * eta;
+    }
 
     /* Random ordering of input patterns */
     for (p = 0; p < num_pattern; ++p) {
@@ -393,7 +431,6 @@ void train_nn_on_automaton(size_t size, int states,
     }
 
     for (size_t s = 0; s < num_pattern / batch_size; s += batch_size) {
-      batch_error = 0.0;
       for (int b = 0; b < batch_size; ++b) {
         if (s + b >= num_pattern) {
           break;
@@ -404,19 +441,87 @@ void train_nn_on_automaton(size_t size, int states,
                sizeof(double) * (num_input + 1));
       }
 
+
+      /* =================================================== */
+      /* double err1, err2; */
+      /* double derv; */
+
+
+      /* /\* /\\* FILE* temp = fopen("temp.tmp", "w+"); *\\/ *\/ */
+      /* #define CONST 1E-7 */
+
+      /* weight_ho[1 * num_output + 5] += CONST; */
+
+      /* forward(input, output, num_hidden, batch_size, num_input, num_output, */
+      /*         hidden, hidden_bias, weight_ih, weight_ho); */
+
+      /* /\* for (int i = 0; i < (num_input + 1) * batch_size; ++i) { *\/ */
+      /* /\*   fprintf(temp, "%.10f\t", input[i]); *\/ */
+      /* /\* } *\/ */
+      /* /\* fprintf(temp, "\n"); *\/ */
+      /* /\* for (int i = 0; i < (num_input + 1) * num_hidden; ++i) { *\/ */
+      /* /\*   fprintf(temp, "%.10f\t", weight_ih[i]); *\/ */
+      /* /\* } *\/ */
+      /* /\* fprintf(temp, "\n"); *\/ */
+      /* /\* for (int i = 0; i < (num_hidden + 1) * num_output; ++i) { *\/ */
+      /* /\*   fprintf(temp, "%.10f\t", weight_ho[i]); *\/ */
+      /* /\* } *\/ */
+      /* /\* fprintf(temp, "\n"); *\/ */
+      /* /\* for (int i = 0; i < batch_size; ++i) { *\/ */
+      /* /\*   fprintf(temp, "%"PRIu8"\t", target[random_idx[s * batch_size + i]]); *\/ */
+      /* /\* } *\/ */
+      /* /\* fprintf(temp, "\n"); *\/ */
+      /* /\* for (int i = 0; i < batch_size * num_output; ++i) { *\/ */
+      /* /\*   fprintf(temp, "%.10f\t", output[i]); *\/ */
+      /* /\* } *\/ */
+
+      /* err1 = compute_loss(s, batch_size, random_idx, num_output, */
+      /*                     output, target); */
+
+      /* weight_ho[1 * num_output+ 5] -= 2 * CONST; */
+
+      /* forward(input, output, num_hidden, batch_size, num_input, num_output, */
+      /*         hidden, hidden_bias, weight_ih, weight_ho); */
+
+      /* err2 = compute_loss(s, batch_size, random_idx, num_output, */
+      /*                     output, target); */
+
+      /* derv = (err1 - err2) / (2 * CONST); */
+
+      /* compute_batch_gradients(s, alpha, batch_size, num_input, num_output, */
+      /*                         num_hidden, */
+      /*                         random_idx, output, target, */
+      /*                         delta_output, delta_w_ho, hidden_bias, weight_ho, */
+      /*                         delta_h, delta_w_ih, input, */
+      /*                         delta_w_ih_prev, delta_w_ho_prev, opts); */
+
+      /* /\* assert(fabs(derv - delta_w_ho[1 * num_output+ 5]) *\/ */
+      /* /\*        < CONST); *\/ */
+      /* /\* fprintf(stdout, "%.15f %.15f %f %f %.15f %f --\n", err1, err2, *\/ */
+      /* /\*         derv, delta_w_ho[1* num_output + 5], *\/ */
+      /* /\*         fabs(derv - delta_w_ho[1 * num_output+ 5]), *\/ */
+      /* /\*         (fabs(derv) + fabs(delta_w_ho[1 * num_output + 5])) ); *\/ */
+
+      /* weight_ho[1 * num_output + 5] += CONST; */
+
+
+      /* =================================================== */
+
       /* Forward pass */
       forward(input, output, num_hidden, batch_size, num_input, num_output,
               hidden, hidden_bias, weight_ih, weight_ho);
 
+      batch_error = compute_loss(s, batch_size, random_idx, num_output,
+                                 output, target);
 
       compute_batch_gradients(s, alpha, batch_size, num_input, num_output,
                               num_hidden,
-                              random_idx, eta, &batch_error, output, target,
+                              random_idx, output, target,
                               delta_output, delta_w_ho, hidden_bias, weight_ho,
                               delta_h, delta_w_ih, input,
-                              delta_w_ih_prev, delta_w_ho_prev);
+                              delta_w_ih_prev, delta_w_ho_prev, opts);
 
-      update_weights(num_input, num_hidden, num_output, &batch_error, reg,
+      update_weights(num_input, num_hidden, num_output, eta, &batch_error, reg,
                      alpha, weight_ih, delta_w_ih, delta_w_ih_prev, weight_ho,
                      delta_w_ho, delta_w_ho_prev);
 
