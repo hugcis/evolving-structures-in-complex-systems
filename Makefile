@@ -4,7 +4,7 @@ current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
 CC=gcc
 LD=gcc
 CFLAGS=-Isrc -Wall -O3 -march=native -funroll-loops -ffast-math -flto=thin
-LDFLAGS=-Wall -lz -O3 -flto=thin -framework Accelerate -lgsl
+LDFLAGS=-Wall -lz  -framework Accelerate -lgsl -O3 -flto=thin
 SRCDIR:=src
 BUILDDIR:=build
 BINDIR:=bin
