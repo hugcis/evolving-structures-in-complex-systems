@@ -722,16 +722,27 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       nn_file = fopen(nn_fname, "w+");
 
       network_result_t res = {1.};
-      network_opts_t n_opts = {100, 30, 3, MOMENTUM, NO_DECAY};
+      network_opts_t n_opts = {10, 30, 3, MOMENTUM, DECAY};
 
-      for (int i = 3; i < 4; ++i) {
+      for (int i = 1; i < 6; ++i) {
+        n_opts.num_hid = 10;
         n_opts.offset = i;
         train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
         add_nn_results_to_file(nn_file, &n_opts, &res, 300);
+        train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &n_opts, &res, 50);
+        train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &n_opts, &res, 5);
 
         n_opts.num_hid = 20;
         train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
         add_nn_results_to_file(nn_file, &n_opts, &res, 300);
+        train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &n_opts, &res, 50);
+        train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &n_opts, &res, 5);
+        results->nn_tr_300 = res.train_error;
+        results->nn_te_300 = res.test_error;
       }
     }
   }
