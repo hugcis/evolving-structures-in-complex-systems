@@ -105,8 +105,9 @@ void init_automat(size_t size, uint8_t* a, int states)
   }
 }
 
-/** A function that will read a pattern file and initialize the automaton a
- *  with the specified pattern.
+/**
+ * A function that will read a pattern file and initialize the automaton a
+ * with the specified pattern.
  */
 int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
 {
@@ -163,8 +164,9 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
   return pattern_start;
 }
 
-/** Function that updates the automaton state from the buffer last_autom to the
- *  buffer autom. It uses a rule stored as a lookup table.
+/**
+ * Function that updates the automaton state from the buffer last_autom to the
+ * buffer autom. It uses a rule stored as a lookup table.
  */
 void update_step_general(size_t size,
                          uint8_t* autom,
@@ -251,7 +253,9 @@ void update_step_general(size_t size,
   }
 }
 
-/** Obsolete update function to work with totalistic rules */
+/**
+ * Obsolete update function to work with totalistic rules
+ */
 void update_step_totalistic(size_t size,
                             uint8_t* base,
                             uint8_t* rule,
@@ -278,7 +282,9 @@ void update_step_totalistic(size_t size,
   memcpy(base, A, size * size * sizeof(uint8_t));
 }
 
-/** Count the cells in each state and return the minority state cell count */
+/**
+ * Count the cells in each state and return the minority state cell count
+ */
 int count_cells(size_t size, uint8_t* A, int states)
 {
   int* counts = (int*)calloc(states, sizeof(int));
@@ -459,8 +465,9 @@ void add_results_to_file(map_t map_source, size_t size,
   free(result);
 }
 
-/** Add results computed with the neural network to a file. Some parameters are
- *  also written to have tracability
+/**
+ * Add results computed with the neural network to a file. Some parameters are
+ * also written to have tracability
  */
 void add_nn_results_to_file(FILE* file, network_opts_t* opts,
                             network_result_t* res, int timesteps)
@@ -488,8 +495,9 @@ void make_mask(int pert, masking_element_t* mask, size_t size, int states)
   }
 }
 
-/** Function to add random noise to an automaton with probability `rate`. Noise
- *  consists in switching a cell to a random different state.
+/**
+ * Function to add random noise to an automaton with probability `rate`. Noise
+ * consists in switching a cell to a random different state.
  */
 void random_noise(size_t size, uint8_t* automaton, int states, double rate)
 {
@@ -506,7 +514,8 @@ void random_noise(size_t size, uint8_t* automaton, int states, double rate)
   }
 }
 
-/** Main entrypoint that handles all the automaton processing.
+/**
+ * Main entrypoint that handles all the automaton processing.
  */
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[],
