@@ -8,7 +8,7 @@
 #include "rule.h"
 
 #define DIRICHLET 1
-#define D_CONST 1.
+#define D_CONST .4
 
 void populate_buf(uint64_t grule_size, uint8_t* rule_array, char* rule_buf)
 {

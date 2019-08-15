@@ -309,8 +309,8 @@ double compute_loss(int base_index, int batch_size,
   return batch_error;
 }
 
-double compute_test_error(int num_pattern, int num_output, int num_hidden,
-                          int num_input,
+double compute_test_error(int num_pattern, int num_output,
+                          int num_hidden, int num_input,
                           double* input, uint8_t* target,
                           double* weight_ih, double* weight_ho)
 {
@@ -318,7 +318,7 @@ double compute_test_error(int num_pattern, int num_output, int num_hidden,
   double val;
 
   /* Allocate placeholders in the function to make it more
-     adaptable */
+     adaptable to the input dataset. */
   double* output =
     (double*) malloc(sizeof(double) * num_pattern * num_output);
   double* hidden =
@@ -326,9 +326,11 @@ double compute_test_error(int num_pattern, int num_output, int num_hidden,
   double* hidden_bias =
     (double*) malloc(sizeof(double) * num_pattern * (num_hidden + 1));
 
+  /* Compute the output of the network */
   forward(input, output, num_hidden, num_pattern, num_input, num_output,
           hidden, hidden_bias, weight_ih, weight_ho);
 
+  /* Compute loss */
   for (int p = 0; p < num_pattern; ++p) {
     val = output[p * num_output + target[p]];
     test_error += - log((val > 0) ? val: DBL_MIN);
@@ -391,6 +393,7 @@ void train_nn_on_automaton(size_t size, int states,
   double* delta_w_ih_prev = NULL;
   double* delta_w_ho_prev = NULL;
 
+  /* Allocate only if being used later */
   if (opts->optim_type == NESTEROV) {
     delta_w_ih_prev = malloc(sizeof(double) * (num_input + 1) * num_hidden);
     delta_w_ho_prev =  malloc(sizeof(double) * (num_hidden + 1) * num_output);
@@ -406,12 +409,13 @@ void train_nn_on_automaton(size_t size, int states,
   size_t np, op, p;
   size_t random_idx[num_pattern];
   double test_error;
+  double weight_mean;
 
+  /* Initialize the weights of the network */
   init_weights(num_hidden, num_input, num_output,
                delta_w_ih, weight_ih,
                delta_w_ho, weight_ho);
 
-  double weight_mean;
   for (epoch = 0; epoch < opts->max_epoch; ++epoch) {
     error = 0.0;
     weight_mean = 0.0;
@@ -420,9 +424,8 @@ void train_nn_on_automaton(size_t size, int states,
     if (epoch > 0 && epoch%3 == 0 && opts->decay == DECAY) {
       eta -= .5 * eta;
     }
-    /* fprintf(stdout, "%f\n", eta); */
 
-    /* Random ordering of input patterns */
+    /* Random ordering of input patterns done at each epoch */
     for (p = 0; p < num_pattern; ++p) {
       random_idx[p] = p;
     }
@@ -433,6 +436,7 @@ void train_nn_on_automaton(size_t size, int states,
       random_idx[np] = op;
     }
 
+    /* Loop through every batch in the dataset */
     for (size_t s = 0; s < num_pattern; s += batch_size) {
       for (int b = 0; b < batch_size; ++b) {
         if (s + b >= num_pattern) {
