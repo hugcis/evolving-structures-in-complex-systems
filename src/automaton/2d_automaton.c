@@ -1,10 +1,10 @@
 #include <assert.h>
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <inttypes.h>
+#include <ctype.h>
 #include "2d_automaton.h"
 #include "automaton/rule.h"
 #include "nn/nn.h"
@@ -105,6 +105,63 @@ void init_automat(size_t size, uint8_t* a, int states)
   }
 }
 
+/** A function that will read a pattern file and initialize the automaton a
+ *  with the specified pattern.
+ */
+int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
+{
+  char ch; /* Character placeholder for the file */
+  int pattern_start = 0; /* Flag indicating wether we are reading the header
+                            or the pattern */
+  size_t x = size/2, y = size/2; /* Pattern's upper left corner is the center
+                                    of the automaton */
+
+  while ((ch = fgetc(pattern_file)) != EOF && pattern_start != -1)  {
+    switch (ch) {
+    case '#':
+        if (pattern_start == 0) {
+          pattern_start = 1; /* Pattern is starting */
+        }
+        else if (pattern_start == 1) {
+          pattern_start = 2;  /* Pattern ends */
+        }
+        break;
+    case '\n':
+      if (pattern_start == 1) {
+        /* Line breaks indicate new line in the pattern */
+        x++;
+        y = size/2;
+      }
+      break;
+    case 'B': /* Beginning of BG flag to fill background with a state */
+      /* We need to write the next characters since the format is BG=X */
+      if ((ch = fgetc(pattern_file)) != EOF
+          && ch == 'G'
+          && (ch = fgetc(pattern_file)) != EOF
+          && ch == '='
+          && (ch = fgetc(pattern_file)) != EOF
+          && isdigit(ch) != 0) {
+        for (int i = 0; i < size; ++i) {
+          for (int j = 0; j < size; ++j) {
+            a[i * size + j] = (uint8_t)(ch - '0');
+          }
+        }
+      }
+      break;
+    default:
+      /* If we are reading the pattern and a digit comes up, add it
+         to the automaton */
+      if (pattern_start == 1 && isdigit(ch) != 0) {
+        a[x * size + y] = (uint8_t)(ch - '0');
+        y++;
+      }
+      break;
+    }
+  }
+
+  fclose(pattern_file);
+  return pattern_start;
+}
 
 void update_step_general(size_t size,
                          uint8_t* autom,
@@ -486,7 +543,13 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   uint8_t* automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
   uint8_t* automat300 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
 
-  init_automat(size, *frame1, states);
+  if (opts->init_pattern_file == NULL) {
+    init_automat(size, *frame1, states);
+  }
+  else if (parse_pattern(size, *frame1, opts->init_pattern_file) <= 0){
+    fprintf(stderr, "Error parsing initialization pattern\n");
+    exit(EXIT_FAILURE);
+  }
   memcpy(*frame2, *frame1, size * size * sizeof(uint8_t));
 
   char dbl_pholder[2 * ((size + 1) * size + 1)];

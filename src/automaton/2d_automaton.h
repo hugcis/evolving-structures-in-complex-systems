@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <stdio.h>
 
 #ifndef TWOD_AUTOMATON_H /* Include guard */
 #define TWOD_AUTOMATON_H
@@ -34,6 +35,7 @@ struct Options2D {
   enum MaskEnum mask;
   enum DataOutput output_data; /**< Wether to compute metrics on the
                                   simulations */
+  FILE* init_pattern_file;
 };
 
 typedef struct results_nn_s

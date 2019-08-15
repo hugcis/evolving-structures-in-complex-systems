@@ -11,11 +11,12 @@ SIZE=256;
 GRAIN=50;
 DELAY=30;
 Q="";
+PAT="";
 
 # A POSIX variable
 OPTIND=1         # Reset in case getopts has been used previously in the shell.
 
-while getopts "h?qd:g:s:t:n:" opt; do
+while getopts "h?qd:g:s:t:n:j:" opt; do
     case "$opt" in
         h|\?)
             show_help
@@ -33,6 +34,8 @@ while getopts "h?qd:g:s:t:n:" opt; do
             ;;
         n)  STATES=$OPTARG
             ;;
+        j)  PAT="-j $OPTARG"
+            ;;
     esac
 done
 
@@ -43,8 +46,8 @@ shift $((OPTIND-1))
 tmpdir=$(mktemp -d)
 
 ./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$@.map" -t $TIME \
-                -s $SIZE -w $GRAIN $Q -e -o $tmpdir ||
-    { echo 'Map file not found'; exit 1; }
+                -s $SIZE -w $GRAIN $Q -e -o $tmpdir $PAT ||
+    { echo 'Failure during automaton simulation'; exit 1; }
 
 ./make_frames.sh $tmpdir $DELAY $SIZE $STATES $TIME $GRAIN
 

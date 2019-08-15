@@ -39,9 +39,10 @@ int main_2d(int argc, char** argv)
   opts.noise_step = 133;
   opts.mask = NO_MASK;
   opts.output_data = OUTPUT;
+  opts.init_pattern_file = NULL;
 
   /* Optional arguments processing */
-  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:mw:ero:q")) != -1)
+  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:mw:ero:qj:")) != -1)
     switch (c) {
     case 'r':
       search = 1;
@@ -96,6 +97,13 @@ int main_2d(int argc, char** argv)
     case 'q':
       opts.mask = MASK;
       break;
+    case 'j':
+      opts.init_pattern_file = fopen(optarg, "r");
+      if (opts.init_pattern_file == NULL) {
+        fprintf(stderr, "Error opening file %s\n", optarg);
+        err = 1;
+      }
+      break;
     case '?':
       err = 1;
       break;
@@ -103,7 +111,7 @@ int main_2d(int argc, char** argv)
 
   if (err) {
     fprintf(stderr, usage, argv[0]);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   time_t t;
@@ -190,7 +198,7 @@ int main_2d(int argc, char** argv)
   printf("\n");
   free(rule_array);
   free(rule_buf);
-  return 0;
+  return EXIT_SUCCESS;
 }
 
 int main_1d(int argc, char** argv)
