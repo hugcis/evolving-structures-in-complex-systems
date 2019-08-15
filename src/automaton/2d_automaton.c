@@ -134,7 +134,7 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
       }
       break;
     case 'B': /* Beginning of BG flag to fill background with a state */
-      /* We need to write the next characters since the format is BG=X */
+      /* We need to read the next 3 characters since the format is BG=X */
       if ((ch = fgetc(pattern_file)) != EOF
           && ch == 'G'
           && (ch = fgetc(pattern_file)) != EOF
@@ -150,7 +150,7 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
       break;
     default:
       /* If we are reading the pattern and a digit comes up, add it
-         to the automaton */
+         to the automaton and increment coordinates */
       if (pattern_start == 1 && isdigit(ch) != 0) {
         a[x * size + y] = (uint8_t)(ch - '0');
         y++;
@@ -163,6 +163,9 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
   return pattern_start;
 }
 
+/** Function that updates the automaton state from the buffer last_autom to the
+ *  buffer autom. It uses a rule stored as a lookup table.
+ */
 void update_step_general(size_t size,
                          uint8_t* autom,
                          uint8_t* rule,
@@ -174,6 +177,7 @@ void update_step_general(size_t size,
   uint8_t current_value;
   int increment;
 
+  /* Take care of cells not on boundary first */
   for (size_t i = horizon; i < size - horizon; i++) {
     for (size_t j = horizon; j < size - horizon; j++) {
       position = 0;
@@ -191,6 +195,8 @@ void update_step_general(size_t size,
   }
 
   /* Deal with boundary conditions separately */
+  /* TODO: These boundary conditions updates only work with horizon=1 */
+  /* First and last line */
   for (size_t j = 0; j < size; ++j) {
     position = 0;
     increment = 0;
@@ -217,6 +223,7 @@ void update_step_general(size_t size,
     autom[(size - 1) * size + j] = rule[position];
   }
 
+  /* First and last column */
   for (size_t i = 0; i < size; ++i) {
     position = 0;
     increment = 0;
@@ -244,6 +251,7 @@ void update_step_general(size_t size,
   }
 }
 
+/** Obsolete update function to work with totalistic rules */
 void update_step_totalistic(size_t size,
                             uint8_t* base,
                             uint8_t* rule,
@@ -270,6 +278,7 @@ void update_step_totalistic(size_t size,
   memcpy(base, A, size * size * sizeof(uint8_t));
 }
 
+/** Count the cells in each state and return the minority state cell count */
 int count_cells(size_t size, uint8_t* A, int states)
 {
   int* counts = (int*)calloc(states, sizeof(int));
@@ -450,6 +459,9 @@ void add_results_to_file(map_t map_source, size_t size,
   free(result);
 }
 
+/** Add results computed with the neural network to a file. Some parameters are
+ *  also written to have tracability
+ */
 void add_nn_results_to_file(FILE* file, network_opts_t* opts,
                             network_result_t* res, int timesteps)
 {
@@ -476,6 +488,9 @@ void make_mask(int pert, masking_element_t* mask, size_t size, int states)
   }
 }
 
+/** Function to add random noise to an automaton with probability `rate`. Noise
+ *  consists in switching a cell to a random different state.
+ */
 void random_noise(size_t size, uint8_t* automaton, int states, double rate)
 {
   size_t rand_x, rand_y;
@@ -491,6 +506,8 @@ void random_noise(size_t size, uint8_t* automaton, int states, double rate)
   }
 }
 
+/** Main entrypoint that handles all the automaton processing.
+ */
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[],
                   int totalistic, long steps,
