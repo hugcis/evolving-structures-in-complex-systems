@@ -3,20 +3,25 @@
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
+#include <errno.h>
 #include "automaton/2d_automaton.h"
 #include "automaton/rule.h"
 #include "automaton/wolfram_automaton.h"
 #include "utils/utils.h"
 #include "search/genetic.h"
 
+extern int errno ;
 
 const char help[] = "Use with either 2d or 1d as first argument";
 
 int main_2d(int argc, char** argv)
 {
   char usage[] = "%s 2d [-n n_states] [-i input_rule] [-s size] [-t timesteps]"
-    "[-g grain] [-c compress]";
-  char one_input[] = "Give only one input, either -i rule or -f rule_file";
+    " [-g grain] [-c compress]\n";
+  char one_input[] = "Provide only one input, either -i rule (for inline) or -f"
+    " rule_file (for a file).\n";
+  char wrong_transitions[] = "Incorrect rule in file %s: %"PRIu64
+    " transitions found but %"PRIu64" were expected.\n";
 
   extern char *optarg;
   extern int optind;
@@ -130,6 +135,7 @@ int main_2d(int argc, char** argv)
   /* If input was given, it was either directly inline or via a file */
   if (input_fname) {
     FILE* rule_file;
+
     if ((rule_file = fopen(input_fname, "r"))) {
       uint64_t count = 0;
       while ((c = getc(rule_file)) != EOF && count < grule_size) {
@@ -137,14 +143,19 @@ int main_2d(int argc, char** argv)
         rule_buf[count] = c;
         count++;
       }
+
       rule_buf[count] = '\0';
+
       if (count != grule_size) {
-        fprintf(stderr, "Incorrect rule in file %s\n", input_fname);
+        fprintf(stderr, wrong_transitions, input_fname,
+                count, grule_size);
         exit(1);
       }
+
     }
     else {
-      fprintf(stderr, "Error while opening file %s\n", input_fname);
+      fprintf(stderr, "Error while opening file %s: %s\n", input_fname,
+              strerror(errno));
       exit(1);
     }
     free(input_fname);

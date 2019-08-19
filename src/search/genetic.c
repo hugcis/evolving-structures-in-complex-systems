@@ -25,16 +25,13 @@ int cmp(const void *a, const void *b)
 
 double compute_score(results_nn_t* res)
 {
-  /* For now, hardcoded weighting coefs for score */
-  /* double a = 7./10., b = 7./10., c = -4./10.; */
-
   /* Either premature stop or some training did go to 0 */
   if (res->nn_te_300 * res->nn_te_50 * res->nn_te_5 == 0) {
     return 0.;
   }
   /* Everything went well */
   else {
-    return res->nn_te_300 / res->nn_tr_300;
+    return 1 - (res->nn_te_50 / res->nn_tr_50);
   }
 }
 
