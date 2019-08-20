@@ -13,7 +13,13 @@
 #include "utils/hashmap.h"
 
 #if PROFILE
-#define PROF(x) {clock_t t1=clock();x;clock_t t2=clock();t += t2 - t1;printf("\rLoop per second %g ", ((double) i / ((double) t * 1E-6)));}
+#define PROF(x) {\
+    clock_t t1=clock();\
+    x;\
+    clock_t t2=clock();\
+    t += t2 - t1;\
+    printf("\rLoop per second %g ", ((double) i / ((double) t * 1E-6)));\
+  }
 #else
 #define PROF(x) x;
 #endif
@@ -808,37 +814,37 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
 
       asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf);
-      nn_file = fopen(nn_fname, "w+");
+      /* nn_file = fopen(nn_fname, "w+"); */
 
       network_result_t res = {1.};
-      network_opts_t n_opts = {10, 30, 3, MOMENTUM, DECAY};
+      network_opts_t n_opts = {10, 30, 3, MOMENTUM, DECAY, FISHER};
 
-      for (int i = 5; i < 6; ++i) {
+      for (int i = 2; i < 3; ++i) {
         n_opts.num_hid = 10;
         n_opts.offset = i;
 
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
-        /* results->nn_tr_300 = res.train_error; */
-        /* results->nn_te_300 = res.test_error; */
-
         train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
-        add_nn_results_to_file(nn_file, &n_opts, &res, 50);
-        results->nn_tr_50 = res.train_error;
-        results->nn_te_50 = res.test_error;
+      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
+      /*   results->nn_tr_300 = res.train_error; */
+      /*   results->nn_te_300 = res.test_error; */
 
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
-        /* results->nn_tr_5 = res.train_error; */
-        /* results->nn_te_5 = res.test_error; */
+      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
+      /*   results->nn_tr_50 = res.train_error; */
+      /*   results->nn_te_50 = res.test_error; */
 
-        /* n_opts.num_hid = 20; */
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
+      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
+      /*   results->nn_tr_5 = res.train_error; */
+      /*   results->nn_te_5 = res.test_error; */
+
+      /*   n_opts.num_hid = 20; */
+      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
+      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
+      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
       }
     }
   }

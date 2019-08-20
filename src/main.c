@@ -59,7 +59,7 @@ int main_2d(int argc, char** argv)
     case 'f':
       if (input_flag == 1) {
         fprintf(stderr, one_input, NULL);
-        exit(1);
+        exit(EXIT_FAILURE);
       }
       input_flag = 1;
       if (c == 'i') {
@@ -149,14 +149,14 @@ int main_2d(int argc, char** argv)
       if (count != grule_size) {
         fprintf(stderr, wrong_transitions, input_fname,
                 count, grule_size);
-        exit(1);
+        exit(EXIT_FAILURE);
       }
 
     }
     else {
       fprintf(stderr, "Error while opening file %s: %s\n", input_fname,
               strerror(errno));
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     free(input_fname);
   }
@@ -262,7 +262,7 @@ int main_1d(int argc, char** argv)
       }
       else {
         printf(invalid_init, optarg);
-        exit(1);
+        exit(EXIT_FAILURE);
       }
       break;
     case 'g':
@@ -275,7 +275,7 @@ int main_1d(int argc, char** argv)
 
   if (err) {
     fprintf(stderr, usage, argv[0]);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   size_t rule_size = (int)pow(states, 2 * options.radius + 1);

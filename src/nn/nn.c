@@ -8,6 +8,7 @@
 #include <cblas.h>
 #endif
 
+#define AVERAGE_FISHER 100
 
 /**
  * A function for generating random numbers according to a N(mu, sigma) Gaussian
@@ -309,10 +310,81 @@ double compute_loss(int base_index, int batch_size,
   return batch_error;
 }
 
-double compute_test_error(int num_pattern, int num_output,
-                          int num_hidden, int num_input,
-                          double* input, uint8_t* target,
-                          double* weight_ih, double* weight_ho)
+
+double compute_fisher(int states, int neighbors,
+                      int num_pattern, int num_output,
+                      int num_hidden, int num_input,
+                      double* input,
+                      double* weight_ih, double* weight_ho)
+{
+  double fisher_information = 0.0;
+  int neighbor_n, base, index, delta;
+
+  /* Build the secondary input that will be perturbed */
+  double* perturbed_input =
+    (double*) malloc(sizeof(double) * num_pattern * (num_input + 1));
+
+  /* Allocate placeholders in the function to make it more
+     adaptable to the input dataset. */
+  double* output =
+    (double*) malloc(sizeof(double) * num_pattern * num_output);
+  double* output_pert =
+    (double*) malloc(sizeof(double) * num_pattern * num_output);
+  double* hidden =
+    (double*) malloc(sizeof(double) * num_pattern * num_hidden);
+  double* hidden_bias =
+    (double*) malloc(sizeof(double) * num_pattern * (num_hidden + 1));
+
+  /* Compute the output of the network on the base dataset */
+  forward(input, output, num_hidden, num_pattern, num_input, num_output,
+          hidden, hidden_bias, weight_ih, weight_ho);
+
+  for (int n = 0; n < AVERAGE_FISHER; ++n) {
+
+    /* Perturb second input */
+    memcpy(perturbed_input, input,
+          sizeof(double) * num_pattern * (num_input + 1));
+    for (int i = 0; i < num_pattern; ++i) {
+      /* Choose index of the input cell to perturb */
+      neighbor_n = rand() % neighbors;
+      index = i * (num_input + 1) + neighbor_n * states;
+
+      for (int t = 0; t < states; ++t) {
+        base = 1 + (rand() % (states - 1));
+        perturbed_input[index + ((base + t) % states)] =
+          input[index + t];
+      }
+    }
+    /* Compute the output of the network on the perturbed dataset */
+    forward(perturbed_input, output_pert, num_hidden, num_pattern,
+            num_input, num_output, hidden, hidden_bias, weight_ih, weight_ho);
+
+    for (int i = 0; i < num_pattern; ++i) {
+      for (int j = 0; j < num_output; ++j) {
+        if (output_pert[i * num_output + j] > 0
+            && output[i * num_output + j] > 0) {
+          delta = (log(output[i * num_output + j]) -
+                  log(output_pert[i * num_output + j]));
+          fisher_information += output[i * num_output + j]
+            * delta * delta;
+        }
+      }
+    }
+
+  }
+  free(output);
+  free(hidden);
+  free(hidden_bias);
+  free(perturbed_input);
+  free(output_pert);
+
+  return fisher_information / (AVERAGE_FISHER * num_pattern);
+}
+
+double compute_error(int num_pattern, int num_output,
+                     int num_hidden, int num_input,
+                     double* input, uint8_t* target,
+                     double* weight_ih, double* weight_ho)
 {
   double test_error = 0.0;
   double val;
@@ -408,8 +480,7 @@ void train_nn_on_automaton(size_t size, int states,
   int epoch;
   size_t np, op, p;
   size_t random_idx[num_pattern];
-  double test_error;
-  double weight_mean;
+  double test_error, fish_info = 0.0;
 
   /* Initialize the weights of the network */
   init_weights(num_hidden, num_input, num_output,
@@ -418,7 +489,6 @@ void train_nn_on_automaton(size_t size, int states,
 
   for (epoch = 0; epoch < opts->max_epoch; ++epoch) {
     error = 0.0;
-    weight_mean = 0.0;
 
     /* Learning rate decay */
     if (epoch > 0 && epoch%3 == 0 && opts->decay == DECAY) {
@@ -477,24 +547,39 @@ void train_nn_on_automaton(size_t size, int states,
   }
 
   /* Compute error on the training set */
-  error = compute_test_error(num_pattern, num_output, num_hidden,
-                             num_input, base_input, target,
-                             weight_ih, weight_ho);
+  error = compute_error(num_pattern, num_output, num_hidden,
+                        num_input, base_input, target,
+                        weight_ih, weight_ho);
+
+  /* Compute Fisher information if needed by the option */
+  if (opts->fisher == FISHER) {
+    res->fisher_info = compute_fisher(states, (side*side - 1), num_pattern,
+                                      num_output, num_hidden, num_input,
+                                      base_input, weight_ih, weight_ho);
+  }
 
   /* Fill the placeholders with test data */
   fill_input_target(size, test_input, test_target,
                     test_automaton, opts->offset, states);
   /* Compute error on the test set */
-  test_error = compute_test_error(num_pattern, num_output, num_hidden,
-                                  num_input, test_input, test_target,
-                                  weight_ih, weight_ho);
+  test_error = compute_error(num_pattern, num_output, num_hidden,
+                             num_input, test_input, test_target,
+                             weight_ih, weight_ho);
 
-  fprintf(stdout, "\nTrain error: %f\tTest error: %f\t Ratio: %f\t Diff: %f\n",
+  /* Log results */
+  fprintf(stdout, "\nTrain error: %f\tTest error: %f\tRatio: %f\tDiff: %f\n",
           error, test_error, test_error/error, test_error - error);
+  if (opts->fisher== FISHER) {
+    fprintf(stdout, "\tFisher: %f\n", fish_info);
+  } else {
+    fprintf(stdout, "\n");
+  }
 
+  /* Output data */
   res->train_error = error;
   res->test_error = test_error;
 
+  /* Cleanup allocated arrays */
   free(base_input);
   free(test_input);
   free(test_target);
