@@ -48,6 +48,23 @@ double rand_normal()
 }
 
 /**
+ * @brief Shuffle the index array.
+ */
+void shuffle_index(size_t num_pattern, size_t random_idx[num_pattern])
+{
+  size_t p, np, op;
+  for (p = 0; p < num_pattern; ++p) {
+    random_idx[p] = p;
+  }
+  for (p = 0; p < num_pattern; ++p) {
+    np = p + ((double)rand()/((double)RAND_MAX+1)) * (num_pattern - 1 - p);
+    op = random_idx[p];
+    random_idx[p] = random_idx[np];
+    random_idx[np] = op;
+  }
+}
+
+/**
  * This function fills the input and target vector with the list of training
  * examples from automaton.
  */
@@ -478,7 +495,6 @@ void train_nn_on_automaton(size_t size, int states,
   double output[batch_size * num_output];
 
   int epoch;
-  size_t np, op, p;
   size_t random_idx[num_pattern];
   double test_error, fish_info = 0.0;
 
@@ -488,6 +504,7 @@ void train_nn_on_automaton(size_t size, int states,
                delta_w_ho, weight_ho);
 
   for (epoch = 0; epoch < opts->max_epoch; ++epoch) {
+    /* Initialize error */
     error = 0.0;
 
     /* Learning rate decay */
@@ -496,15 +513,7 @@ void train_nn_on_automaton(size_t size, int states,
     }
 
     /* Random ordering of input patterns done at each epoch */
-    for (p = 0; p < num_pattern; ++p) {
-      random_idx[p] = p;
-    }
-    for (p = 0; p < num_pattern; ++p) {
-      np = p + ((double)rand()/((double)RAND_MAX+1)) * (num_pattern - 1 - p);
-      op = random_idx[p];
-      random_idx[p] = random_idx[np];
-      random_idx[np] = op;
-    }
+    shuffle_index(num_pattern, random_idx);
 
     /* Loop through every batch in the dataset */
     for (size_t s = 0; s < num_pattern; s += batch_size) {
@@ -526,6 +535,7 @@ void train_nn_on_automaton(size_t size, int states,
       batch_error = compute_loss(s, batch_size, random_idx, num_output,
                                  output, target);
 
+      /* Compute the gradients for each weight matrix */
       compute_batch_gradients(s, alpha, batch_size, num_input, num_output,
                               num_hidden,
                               random_idx, output, target,
@@ -533,10 +543,13 @@ void train_nn_on_automaton(size_t size, int states,
                               delta_h, delta_w_ih, input,
                               delta_w_ih_prev, delta_w_ho_prev, opts);
 
+      /* Update the weights of the network */
       update_weights(num_input, num_hidden, num_output, eta, &batch_error, reg,
                      alpha, weight_ih, delta_w_ih, delta_w_ih_prev, weight_ho,
                      delta_w_ho, delta_w_ho_prev);
 
+      /* Error is only updated here because it might be changed by
+         `update_weights` */
       error += batch_error * batch_size;
     }
     error /= (double)(num_pattern);
