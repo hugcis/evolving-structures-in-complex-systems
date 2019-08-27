@@ -30,11 +30,11 @@ while getopts "h?qd:g:s:t:n:j:" opt; do
             ;;
         d)  DELAY=$OPTARG
             ;;
-        q)  Q=-q
+        q)  Q=--masking
             ;;
         n)  STATES=$OPTARG
             ;;
-        j)  PAT="-j $OPTARG"
+        j)  PAT="--pattern $OPTARG"
             ;;
     esac
 done
@@ -45,8 +45,11 @@ shift $((OPTIND-1))
 
 tmpdir=$(mktemp -d)
 
-./bin/automaton 2d -n $STATES -m -f "data_2d_$STATES/map/$@.map" -t $TIME \
-                -s $SIZE -w $GRAIN $Q -e -o $tmpdir $PAT ||
+./bin/automaton 2d --n_states $STATES --temp_output\
+                --input_file "data_2d_$STATES/map/$@.map"\
+                --timesteps $TIME\
+                --size $SIZE --write_grain $GRAIN\
+                $Q --early_stopping --output $tmpdir $PAT ||
     { echo 'Failure during automaton simulation'; exit 1; }
 
 ./make_frames.sh $tmpdir $DELAY $SIZE $STATES $TIME $GRAIN
