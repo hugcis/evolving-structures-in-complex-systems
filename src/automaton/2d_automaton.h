@@ -36,6 +36,7 @@ struct Options2D {
   enum DataOutput output_data; /**< Wether to compute metrics on the
                                   simulations */
   FILE* init_pattern_file;
+  long init_type; /**< Size of the random initialization zone (-1 for full) */
 };
 
 typedef struct results_nn_s

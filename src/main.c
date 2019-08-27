@@ -34,6 +34,8 @@ Options:\n\
     -w --write_grain=<w>    Interval between state writes [default: 200].\n\
     -z --n_simulations=<n>  Number of simulations to run [default: 1000].\n\
     -o --output=<dir>       Output dirname for steps [default: 'rule_gif'].\n\
+    -b --init_type=<i>      Size of random disordered initial zone \n\
+                            (-1 for fully random) [default: -1].\n\
     -i --input_rule=<rule>  Inline rule input.\n\
     -f --input_file=<fname> File containing the desired rule.\n\
     -j --pattern=<fname>    Pattern filename.\n\
@@ -47,6 +49,8 @@ Options:\n\
     " rule_file (for a file).\n";
   char wrong_transitions[] = "Incorrect rule in file %s: %"PRIu64
     " transitions found but %"PRIu64" were expected.\n";
+  char too_large_init[] = "Initialization zone size is too large: %l was given"
+    " but size is %lu.\n";
 
   extern char *optarg;
   extern int optind;
@@ -92,6 +96,7 @@ Options:\n\
        {"write_grain", required_argument, 0, 'w'},
        {"output", required_argument, 0, 'o'},
        {"pattern", required_argument, 0, 'j'},
+       {"init_type", required_argument, 0, 'b'},
        {0, 0, 0, 0}
     };
 
@@ -167,6 +172,9 @@ Options:\n\
         err = 1;
       }
       break;
+    case 'b':
+      opts.init_type = atol(optarg);
+      break;
     case 'h':
       fprintf(stdout, usage, argv[0]);
       exit(EXIT_SUCCESS);
@@ -184,6 +192,11 @@ Options:\n\
       fprintf(stderr, usage, argv[0]);
       exit(EXIT_FAILURE);
     }
+  }
+
+  if (opts.init_type >= (long) opts.size) {
+    fprintf(stderr, too_large_init, opts.init_type, opts.size);
+    exit(EXIT_FAILURE);
   }
 
   time_t t;

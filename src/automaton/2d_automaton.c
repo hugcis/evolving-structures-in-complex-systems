@@ -87,9 +87,11 @@ void print_bits(size_t dim1, size_t dim2, uint8_t* a, char* buf)
  * @brief Automaton initializer function.
  *
  */
-void init_automat(size_t size, uint8_t* a, int states)
+void init_automat(size_t size, uint8_t* a, int states, long init_type)
 {
-  assert(size > 20);
+  assert((long) size > init_type);
+  size_t border = (init_type > 0) ? init_type/2: size/2;
+
   for (size_t i = 0; i < size; i++) {
     for (size_t j = 0; j < size; j++) {
       /* Very small automata: initialize at random */
@@ -97,9 +99,9 @@ void init_automat(size_t size, uint8_t* a, int states)
         a[(i % size) * size + (j % size)] = (uint8_t)(rand() % states);
       }
       else {
-        /* Initialize center 20x20 square to random */
-        if ((i >= size/2 - 10) && (i < size/2 + 10) &&
-            (j >= size/2 - 10) && (j < size/2 + 10)) {
+        /* Initialize center (border x border) square to random */
+        if ((i >= size/2 - border) && (i < size/2 + border) &&
+            (j >= size/2 - border) && (j < size/2 + border)) {
           a[(i % size) * size + (j % size)] = (uint8_t)(rand() % states);
         }
         /* Rest is 0 */
@@ -482,6 +484,13 @@ void add_nn_results_to_file(FILE* file, network_opts_t* opts,
           opts->offset, timesteps, res->train_error, res->test_error);
 }
 
+void add_fisher_results_to_file(FILE* file, network_opts_t* opts,
+                                network_result_t* res, int timesteps)
+{
+  fprintf(file, "%i %i %i %i:%f\n", opts->num_hid, opts->max_epoch,
+          opts->offset, timesteps, res->fisher_info);
+}
+
 void mask_autom(int pert, size_t size, masking_element_t* mask,
                 uint8_t* automaton)
 {
@@ -543,6 +552,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   FILE* nn_file = NULL;
   char* nn_fname = NULL;
 
+  FILE* fisher_file = NULL;
+  char* fisher_fname = NULL;
+
   int last_compressed_size;
   int compressed_size;
   int last_cell_count;
@@ -576,7 +588,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   uint8_t* automat300 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
 
   if (opts->init_pattern_file == NULL) {
-    init_automat(size, *frame1, states);
+    init_automat(size, *frame1, states, opts->init_type);
   }
   else if (parse_pattern(size, *frame1, opts->init_pattern_file) <= 0){
     fprintf(stderr, "Error parsing initialization pattern\n");
@@ -814,37 +826,49 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
 
       asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf);
-      /* nn_file = fopen(nn_fname, "w+"); */
+      nn_file = fopen(nn_fname, "w+");
+      asprintf(&fisher_fname, "data_2d_%i/nn/fisher%s.dat", states, rule_buf);
+      fisher_file = fopen(fisher_fname, "w+");
 
       network_result_t res = {1.};
-      network_opts_t n_opts = {10, 30, 3, MOMENTUM, DECAY, FISHER};
+      network_opts_t n_opts = {10, 30, 3, MOMENTUM, DECAY, NO_FISHER, 1};
 
-      for (int i = 2; i < 3; ++i) {
-        n_opts.num_hid = 10;
-        n_opts.offset = i;
+      for (int i = 5; i < 6; ++i) {
+        /* n_opts.num_hid = 10; */
+        /* n_opts.offset = i; */
+        /* n_opts.fisher = NO_FISHER; */
+
+        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+        /* add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
+        /* results->nn_tr_300 = res.train_error; */
+        /* results->nn_te_300 = res.test_error; */
+
+        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+        /* add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
+        /* results->nn_tr_50 = res.train_error; */
+        /* results->nn_te_50 = res.test_error; */
+
+        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+        /* add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
+        /* results->nn_tr_5 = res.train_error; */
+        /* results->nn_te_5 = res.test_error; */
+
+        n_opts.num_hid = 20;
+        /* if (i == 1) { */
+          /* n_opts.fisher = FISHER; */
+        /* } */
+        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+        /* add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
+        /* add_fisher_results_to_file(fisher_file, &n_opts, &res, 300); */
+
+        /* n_opts.fisher = NO_FISHER; */
 
         train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
-      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
-      /*   results->nn_tr_300 = res.train_error; */
-      /*   results->nn_te_300 = res.test_error; */
-
-      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
-      /*   results->nn_tr_50 = res.train_error; */
-      /*   results->nn_te_50 = res.test_error; */
-
-      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
-      /*   results->nn_tr_5 = res.train_error; */
-      /*   results->nn_te_5 = res.test_error; */
-
-      /*   n_opts.num_hid = 20; */
-      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
-      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
-      /*   train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-      /*   add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
+        add_nn_results_to_file(nn_file, &n_opts, &res, 50);
+        results->nn_tr_50 = res.train_error;
+        results->nn_te_50 = res.test_error;
+        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
+        /* add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
       }
     }
   }
@@ -885,5 +909,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   if (nn_file) {
     free(nn_fname);
     fclose(nn_file);
+  }
+  if (fisher_file) {
+    free(fisher_fname);
+    fclose(fisher_file);
   }
 }
