@@ -14,6 +14,7 @@ typedef struct network_opts_s
   enum OptimType optim_type;
   enum LRDecay decay;
   enum FisherInfo fisher;
+  int verbosity;
 } network_opts_t;
 
 typedef struct network_result_s
