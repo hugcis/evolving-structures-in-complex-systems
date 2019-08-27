@@ -4,11 +4,15 @@
 #include <time.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <getopt.h>
 #include "automaton/2d_automaton.h"
 #include "automaton/rule.h"
 #include "automaton/wolfram_automaton.h"
 #include "utils/utils.h"
 #include "search/genetic.h"
+
+#define MAJOR 0
+#define MINOR 1
 
 extern int errno ;
 
@@ -16,8 +20,29 @@ const char help[] = "Use with either 2d or 1d as first argument";
 
 int main_2d(int argc, char** argv)
 {
-  char usage[] = "%s 2d [-n n_states] [-i input_rule] [-s size] [-t timesteps]"
-    " [-g grain] [-c compress]\n";
+  char usage[] = "2D Automaton.\n\n\
+Usage:\n\
+    %s 2d\n\
+\n\
+Options:\n\
+    -h --help               Print this message.\n\
+    -v --version            Print version number.\n\
+    -n --n_states=<n>       Number of states [default: 2].\n\
+    -s --size=<s>           Size of the automaton [default: 256].\n\
+    -t --timesteps=<ts>     Number of timesteps of the simulation.\n\
+    -g --grain=<g>          Grain of compression operations [default: 200].\n\
+    -w --write_grain=<w>    Interval between state writes [default: 200].\n\
+    -z --n_simulations=<n>  Number of simulations to run [default: 1000].\n\
+    -o --output=<dir>       Output dirname for steps [default: 'rule_gif'].\n\
+    -i --input_rule=<rule>  Inline rule input.\n\
+    -f --input_file=<fname> File containing the desired rule.\n\
+    -j --pattern=<fname>    Pattern filename.\n\
+    -r --search             Start a search.\n\
+    -m --temp_output        Do a step-only output for visualization.\n\
+    -e --no_early_stopping  Disable stopping when periodic.\n\
+    -q --masking            Enable masking of the input.\n\
+    -c --compress           Disable compression of outputs.\n";
+
   char one_input[] = "Provide only one input, either -i rule (for inline) or -f"
     " rule_file (for a file).\n";
   char wrong_transitions[] = "Incorrect rule in file %s: %"PRIu64
@@ -30,6 +55,7 @@ int main_2d(int argc, char** argv)
   int compress_flag = 1;
   char* input_rule;
   char* input_fname = NULL;
+
   struct Options2D opts;
   opts.size = 256;
   opts.states = 2;
@@ -44,10 +70,42 @@ int main_2d(int argc, char** argv)
   opts.noise_step = 133;
   opts.mask = NO_MASK;
   opts.output_data = OUTPUT;
+  opts.init_type = -1;
   opts.init_pattern_file = NULL;
 
-  /* Optional arguments processing */
-  while ((c = getopt(argc - 1, &argv[1], "n:i:s:t:g:c:z:f:mw:ero:qj:")) != -1)
+  while (1) {
+    static struct option long_options[] = {
+       {"help", no_argument, 0, 'h'},
+       {"version", no_argument, 0, 'v'},
+       {"search", no_argument, 0, 'r'},
+       {"temp_output", no_argument, 0, 'm'},
+       {"early_stopping", no_argument, 0, 'e'},
+       {"masking", no_argument, 0, 'q'},
+       {"compress", no_argument, 0, 'c'},
+       {"n_states", required_argument, 0, 'n'},
+       {"input_rule", required_argument, 0, 'i'},
+       {"input_file", required_argument, 0, 'f'},
+       {"size", required_argument, 0, 's'},
+       {"timesteps", required_argument, 0, 't'},
+       {"grain", required_argument, 0, 'g'},
+       {"n_simulations", required_argument, 0, 'z'},
+       {"write_grain", required_argument, 0, 'w'},
+       {"output", required_argument, 0, 'o'},
+       {"pattern", required_argument, 0, 'j'},
+       {0, 0, 0, 0}
+    };
+
+    /* getopt_long stores the option index here. */
+    int option_index = 0;
+
+    c = getopt_long (argc - 1, &argv[1],
+                     "hvn:i:s:t:g:cz:f:mw:ero:qj:",
+                     long_options, &option_index);
+
+    /* Detect the end of the options. */
+    if (c == -1)
+      break;
+
     switch (c) {
     case 'r':
       search = 1;
@@ -109,14 +167,23 @@ int main_2d(int argc, char** argv)
         err = 1;
       }
       break;
+    case 'h':
+      fprintf(stdout, usage, argv[0]);
+      exit(EXIT_SUCCESS);
+      break;
+    case 'v':
+      fprintf(stdout, "Version %i.%i\n", MAJOR, MINOR);
+      exit(EXIT_SUCCESS);
+      break;
     case '?':
       err = 1;
       break;
     }
 
-  if (err) {
-    fprintf(stderr, usage, argv[0]);
-    exit(EXIT_FAILURE);
+    if (err) {
+      fprintf(stderr, usage, argv[0]);
+      exit(EXIT_FAILURE);
+    }
   }
 
   time_t t;
