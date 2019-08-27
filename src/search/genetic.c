@@ -31,7 +31,7 @@ double compute_score(results_nn_t* res)
   }
   /* Everything went well */
   else {
-    return 1 - (res->nn_te_50 / res->nn_tr_50);
+    return res->nn_tr_50 / res->nn_te_50;
   }
 }
 
