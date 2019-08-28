@@ -544,10 +544,10 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   char* fname;
 
   FILE* mult_time_file = NULL;
-  char* mult_time_fname;
+  char* mult_time_fname = NULL;
 
   FILE* entrop_file = NULL;
-  char* entrop_fname;
+  char* entrop_fname = NULL;
 
   FILE* nn_file = NULL;
   char* nn_fname = NULL;
@@ -583,9 +583,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   }
 
 
-  uint8_t* automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
-  uint8_t* automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
-  uint8_t* automat300 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
 
   if (opts->init_pattern_file == NULL) {
     init_automat(size, *frame1, states, opts->init_type);
@@ -595,17 +592,21 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     exit(EXIT_FAILURE);
   }
   memcpy(*frame2, *frame1, size * size * sizeof(uint8_t));
+  uint8_t* automat5 = NULL;
+  uint8_t* automat50 = NULL;
+  uint8_t* automat300 = NULL;
+
+  if (opts->output_data != NO_OUTPUT) {
+    automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+    automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+    automat300 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+  }
 
   char dbl_pholder[2 * ((size + 1) * size + 1)];
   char out_string[(size + 1) * size + 1];
   char out_string300[(size + 1) * size + 1];
-  char out_string200[(size + 1) * size + 1];
-  char out_string100[(size + 1) * size + 1];
   char out_string50[(size + 1) * size + 1];
-  char out_string10[(size + 1) * size + 1];
   char out_string5[(size + 1) * size + 1];
-  int dbl_cmp300, dbl_cmp200, dbl_cmp100,
-      dbl_cmp50, dbl_cmp10, dbl_cmp5;
 
   map_t map300 = hashmap_new();
   map_t map50 = hashmap_new();
@@ -736,21 +737,12 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
       memcpy(automat300, *frame1, size * size * sizeof(uint8_t));
     }
-    if (i == steps - 200) {
-      print_bits(size, size, *frame1, out_string200);
-    }
-    if (i == steps - 100) {
-      print_bits(size, size, *frame1, out_string100);
-    }
     if (i == steps - 51) {
       print_bits(size, size, *frame1, out_string50);
       res50 = populate_map(map50, size, *frame1, offset_a, states);
       res50b = populate_map(map50b, size, *frame1, offset_b, states);
 
       memcpy(automat50, *frame1, size * size * sizeof(uint8_t));
-    }
-    if (i == steps - 10) {
-      print_bits(size, size, *frame1, out_string10);
     }
     if (i == steps - 5) {
       print_bits(size, size, *frame1, out_string5);
@@ -760,49 +752,49 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       memcpy(automat5, *frame1, size * size * sizeof(uint8_t));
     }
     if (i == steps - 1) {
-      asprintf(&mult_time_fname, "data_2d_%i/mult/mult%s.dat", states, rule_buf);
-      mult_time_file = fopen(mult_time_fname, "w+");
+      /* asprintf(&mult_time_fname, "data_2d_%i/mult/mult%s.dat", states, rule_buf); */
+      /* mult_time_file = fopen(mult_time_fname, "w+"); */
 
-      print_bits(size, size, *frame1, out_string);
-      memcpy(&dbl_pholder[(size + 1) * size + 1],
-             out_string, (size + 1) * size + 1);
+      /* print_bits(size, size, *frame1, out_string); */
+      /* memcpy(&dbl_pholder[(size + 1) * size + 1], */
+             /* out_string, (size + 1) * size + 1); */
 
-      memcpy(dbl_pholder, out_string300, (size + 1) * size + 1);
-      dbl_cmp300 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string200, (size + 1) * size + 1);
-      dbl_cmp200 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string100, (size + 1) * size + 1);
-      dbl_cmp100 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string50, (size + 1) * size + 1);
-      dbl_cmp50 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string10, (size + 1) * size + 1);
-      dbl_cmp10 = compress_memory_size(dbl_pholder,
-                                        2 * ((size + 1) * size + 1));
-      memcpy(dbl_pholder, out_string5, (size + 1) * size + 1);
-      dbl_cmp5 = compress_memory_size(dbl_pholder,
-                                       2 * ((size + 1) * size + 1));
+      /* memcpy(dbl_pholder, out_string300, (size + 1) * size + 1); */
+      /* dbl_cmp300 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string200, (size + 1) * size + 1); */
+      /* dbl_cmp200 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string100, (size + 1) * size + 1); */
+      /* dbl_cmp100 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string50, (size + 1) * size + 1); */
+      /* dbl_cmp50 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string10, (size + 1) * size + 1); */
+      /* dbl_cmp10 = compress_memory_size(dbl_pholder, */
+      /*                                   2 * ((size + 1) * size + 1)); */
+      /* memcpy(dbl_pholder, out_string5, (size + 1) * size + 1); */
+      /* dbl_cmp5 = compress_memory_size(dbl_pholder, */
+      /*                                  2 * ((size + 1) * size + 1)); */
 
-      fprintf(mult_time_file, "%i    %i    %i    %i    "
-                              "%i    %i    %i    %i    "
-                              "%i    %i    %i    %i    "
-                              "%i\n",
-              compress_memory_size(out_string, (size + 1) * size),
-              dbl_cmp5,
-              compress_memory_size(out_string5, (size + 1) * size),
-              dbl_cmp10,
-              compress_memory_size(out_string10, (size + 1) * size),
-              dbl_cmp50,
-              compress_memory_size(out_string50, (size + 1) * size),
-              dbl_cmp100,
-              compress_memory_size(out_string100, (size + 1) * size),
-              dbl_cmp200,
-              compress_memory_size(out_string200, (size + 1) * size),
-              dbl_cmp300,
-              compress_memory_size(out_string300, (size + 1) * size));
+      /* fprintf(mult_time_file, "%i    %i    %i    %i    " */
+      /*                         "%i    %i    %i    %i    " */
+      /*                         "%i    %i    %i    %i    " */
+      /*                         "%i\n", */
+      /*         compress_memory_size(out_string, (size + 1) * size), */
+      /*         dbl_cmp5, */
+      /*         compress_memory_size(out_string5, (size + 1) * size), */
+      /*         dbl_cmp10, */
+      /*         compress_memory_size(out_string10, (size + 1) * size), */
+      /*         dbl_cmp50, */
+      /*         compress_memory_size(out_string50, (size + 1) * size), */
+      /*         dbl_cmp100, */
+      /*         compress_memory_size(out_string100, (size + 1) * size), */
+      /*         dbl_cmp200, */
+      /*         compress_memory_size(out_string200, (size + 1) * size), */
+      /*         dbl_cmp300, */
+      /*         compress_memory_size(out_string300, (size + 1) * size)); */
 
       asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
       entrop_file = fopen(entrop_fname, "w+");
@@ -831,7 +823,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       fisher_file = fopen(fisher_fname, "w+");
 
       network_result_t res = {1.};
-      network_opts_t n_opts = {10, 30, 3, MOMENTUM, DECAY, NO_FISHER, 1};
+      network_opts_t n_opts = {10, 60, 3, MOMENTUM, DECAY, NO_FISHER, 1};
 
       for (int i = 5; i < 6; ++i) {
         /* n_opts.num_hid = 10; */
@@ -853,7 +845,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
         /* results->nn_tr_5 = res.train_error; */
         /* results->nn_te_5 = res.test_error; */
 
-        n_opts.num_hid = 20;
+        /* n_opts.num_hid = 20; */
         /* if (i == 1) { */
           /* n_opts.fisher = FISHER; */
         /* } */
@@ -863,10 +855,12 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
         /* n_opts.fisher = NO_FISHER; */
 
-        train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res);
-        add_nn_results_to_file(nn_file, &n_opts, &res, 50);
+        train_nn_on_automaton(size, states, automat50, *frame1, &n_opts, &res);
+        /* add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
         results->nn_tr_50 = res.train_error;
         results->nn_te_50 = res.test_error;
+        train_nn_on_automaton(size, states, *frame1, NULL, &n_opts, &res);
+        results->nn_tr_300 = res.train_error;
         /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
         /* add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
       }
@@ -882,9 +876,12 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   free_map(map300b);
   free_map(map50b);
 
-  free(automat5);
-  free(automat50);
-  free(automat300);
+  if (automat5)
+    free(automat5);
+  if (automat50)
+    free(automat50);
+  if (automat300)
+    free(automat300);
 
   if (fname) {
     free(fname);
