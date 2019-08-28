@@ -442,7 +442,7 @@ void train_nn_on_automaton(size_t size, int states,
                            network_result_t* res)
 {
   if (opts->verbosity >= 1) {
-    fprintf(stdout, "Processing with options: h%i r%i e%i\n",
+    fprintf(stdout, "\nProcessing with options: h%i r%i e%i\n",
             opts->num_hid, opts->offset, opts->max_epoch);
   }
 
@@ -504,8 +504,9 @@ void train_nn_on_automaton(size_t size, int states,
 
   int epoch;
   size_t random_idx[num_pattern];
-  double test_error;
-  /* ===================== */
+  double test_error = 0.0;
+
+  /* ================= End declarations ================== */
 
   /* Initialize the weights of the network */
   init_weights(num_hidden, num_input, num_output,
@@ -517,7 +518,7 @@ void train_nn_on_automaton(size_t size, int states,
     error = 0.0;
 
     /* Learning rate decay */
-    if (epoch > 0 && epoch%3 == 0 && opts->decay == DECAY) {
+    if (epoch > 0 && epoch%10 == 0 && opts->decay == DECAY) {
       eta -= .5 * eta;
     }
 
@@ -573,6 +574,10 @@ void train_nn_on_automaton(size_t size, int states,
                         num_input, base_input, target,
                         weight_ih, weight_ho);
 
+  if (opts->verbosity >= 1) {
+    fprintf(stdout, "\nTrain error: %f", error);
+  }
+
   /* Compute Fisher information if the flag requires it */
   if (opts->fisher == FISHER) {
     res->fisher_info = compute_fisher(states, (side*side - 1), num_pattern,
@@ -580,24 +585,27 @@ void train_nn_on_automaton(size_t size, int states,
                                       base_input, weight_ih, weight_ho);
   }
 
-  /* Fill the placeholders with test data */
-  fill_input_target(size, test_input, test_target,
-                    test_automaton, opts->offset, states);
+  if (test_automaton != NULL) {
+    /* Fill the placeholders with test data */
+    fill_input_target(size, test_input, test_target,
+                      test_automaton, opts->offset, states);
 
-  /* Compute error on the test set */
-  test_error = compute_error(num_pattern, num_output, num_hidden,
-                             num_input, test_input, test_target,
-                             weight_ih, weight_ho);
+    /* Compute error on the test set */
+    test_error = compute_error(num_pattern, num_output, num_hidden,
+                               num_input, test_input, test_target,
+                               weight_ih, weight_ho);
+
+    if (opts->verbosity >= 1) {
+      fprintf(stdout, "\tTest error: %f\tRatio: %f\tDiff: %f",
+              test_error, error/test_error, test_error - error);
+    }
+  }
 
   /* Log results */
-  if (opts->verbosity >= 1) {
-    fprintf(stdout, "\nTrain error: %f\tTest error: %f\tRatio: %f\tDiff: %f",
-            error, test_error, test_error/error, test_error - error);
-    if (opts->fisher== FISHER) {
+  if (opts->verbosity >= 1 && opts->fisher== FISHER) {
       fprintf(stdout, "\tFisher: %f\n", res->fisher_info);
-    } else {
+  } else if (opts->verbosity >= 1){
       fprintf(stdout, "\n");
-    }
   }
 
   /* Output data */
