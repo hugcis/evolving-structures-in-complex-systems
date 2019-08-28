@@ -7,12 +7,16 @@
 #include <string.h>
 #include <netpbm/pam.h>
 
-const int palette_rgb[14][3] = {
+const int palette_rgb[18][3] = {
                                 {255, 255, 255},
                                 {0, 0, 0},
                                 {255, 0, 0},
                                 {0, 255, 0},
                                 {0, 0, 255},
+                                {127, 0, 255},
+                                {255, 69, 0},
+                                {255, 255, 0},
+                                {13, 152, 186},
                                 {255, 100, 51},
                                 {42, 75, 215},
                                 {29, 105, 20},
@@ -52,7 +56,14 @@ int main(int argc, const char** argv)
   outpam.depth = 3;
 
   tuple** arr = pnm_allocpamarray(&outpam);
-  int color_offset = states == 2 ? 0 : 2;
+  int color_offset;
+  if (states == 2) {
+    color_offset = 0;
+  } else if (states == 3) {
+    color_offset = 2;
+  } else {
+    color_offset = 5;
+  }
 
   for (row = 0; row < outpam.height; ++row) {
     int column;
