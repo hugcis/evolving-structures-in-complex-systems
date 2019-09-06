@@ -1,22 +1,25 @@
-/* Program that generates ppm file from the step file.
-   Compile with
-   gcc step_to_ppm.c -o step_to_ppm -lnetpbm
+/**
+ * Program that generates ppm file from the step file.
+ * Compile with
+ * gcc step_to_ppm.c -o step_to_ppm -lnetpbm
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <netpbm/pam.h>
 
-const int palette_rgb[18][3] = {
+#define CHANNELS 3
+
+const int palette_rgb[18][CHANNELS] = {
                                 {255, 255, 255},
                                 {0, 0, 0},
-                                {255, 0, 0},
-                                {0, 255, 0},
-                                {0, 0, 255},
-                                {127, 0, 255},
-                                {255, 69, 0},
-                                {255, 255, 0},
-                                {13, 152, 186},
+                                {255, 0, 0},     /* Red */
+                                {0, 255, 0},     /* Green */
+                                {0, 0, 255},     /* Blue */
+                                {127, 0, 255},   /* Purple */
+                                {255, 69, 0},    /* Red-Orange */
+                                {255, 255, 0},   /* Yellow */
+                                {13, 152, 186},  /* Blue-green */
                                 {255, 100, 51},
                                 {42, 75, 215},
                                 {29, 105, 20},
@@ -53,7 +56,7 @@ int main(int argc, const char** argv)
   outpam.height = size;
   outpam.width = size;
   outpam.file = stdout;
-  outpam.depth = 3;
+  outpam.depth = CHANNELS;
 
   tuple** arr = pnm_allocpamarray(&outpam);
   int color_offset;
@@ -69,7 +72,7 @@ int main(int argc, const char** argv)
     int column;
     for (column = 0; column < outpam.width; ++column) {
       unsigned int depth;
-      for (depth = 0; depth < outpam.depth; ++depth) {
+      for (depth = 0; depth < CHANNELS; ++depth) {
         arr[row][column][depth] =
           palette_rgb[automaton[row * size + column] +
                       color_offset][depth];
