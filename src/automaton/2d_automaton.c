@@ -26,6 +26,8 @@
 
 #define KEY_MAX_LENGTH (256)
 #define PERT 1E-15
+#define WINDOW 501
+#define W_STEP 13
 
 typedef struct masking_element
 {
@@ -463,19 +465,21 @@ void free_map(map_t map)
   hashmap_free(map);
 }
 
-void add_results_to_file(map_t map_source, size_t size,
+void add_entropy_results_to_file(map_t map_source, size_t size,
                          uint8_t* automaton, int states,
                          int offset, FILE* file, entrop_state_ph_t* result)
 {
-  fprintf(file, "%f    %f    %"PRIu32"    ",
-          predictive_score(map_source, states, size, automaton, offset),
-          result->entropy, result->visited);
-  free(result);
+  if (result) {
+    fprintf(file, "%f    %f    %"PRIu32"    ",
+            predictive_score(map_source, states, size, automaton, offset),
+            result->entropy, result->visited);
+    free(result);
+  }
 }
 
 /**
  * Add results computed with the neural network to a file. Some parameters are
- * also written to have tracability
+ * also written to have tracability of the results.
  */
 void add_nn_results_to_file(FILE* file, network_opts_t* opts,
                             network_result_t* res, int timesteps)
@@ -541,7 +545,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   size_t size = opts->size;
 
   FILE* out_file = NULL;
-  char* fname;
+  char* fname = NULL;
 
   FILE* mult_time_file = NULL;
   char* mult_time_fname = NULL;
@@ -559,15 +563,13 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   int compressed_size;
   int last_cell_count;
   int cell_count = 0;
-  int size_sum;
-  float ratio = 0;
-  float ratio2 = 0;
+  /* int size_sum; */
+  /* float ratio = 0; */
+  /* float ratio2 = 0; */
 
   ProcessF process_function = totalistic == 1 ?
     update_step_totalistic: update_step_general;
 
-  asprintf(&fname, "data_2d_%i/out/out%s.dat", states, rule_buf);
-  out_file = fopen(fname, "w+");
 
   uint8_t* (*frame1) = malloc(sizeof(uint8_t* (*)));
   *frame1 = (uint8_t*) malloc(size * size * sizeof(uint8_t));
@@ -583,7 +585,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   }
 
 
-
   if (opts->init_pattern_file == NULL) {
     init_automat(size, *frame1, states, opts->init_type);
   }
@@ -596,13 +597,24 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   uint8_t* automat50 = NULL;
   uint8_t* automat300 = NULL;
 
+  uint8_t** test_automata =
+    (uint8_t**) malloc(sizeof(uint8_t*) * (WINDOW / W_STEP));
+
   if (opts->output_data != NO_OUTPUT) {
+    /* asprintf(&fname, "data_2d_%i/out/out%s.dat", states, rule_buf); */
+    /* out_file = fopen(fname, "w+"); */
+
     automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
     automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
     automat300 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+
+    for (int i = 0; i < (WINDOW / W_STEP); ++i) {
+      test_automata[i] = (uint8_t*) calloc(size * size, sizeof(uint8_t));
+    }
   }
 
-  char dbl_pholder[2 * ((size + 1) * size + 1)];
+  /* char* dbl_pholder = (char*) */
+    /* malloc(sizeof(char) * (steps  * ((size + 1) * size + 1))); */
   char out_string[(size + 1) * size + 1];
   char out_string300[(size + 1) * size + 1];
   char out_string50[(size + 1) * size + 1];
@@ -614,7 +626,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   map_t map300b = hashmap_new();
   map_t map50b = hashmap_new();
   map_t map5b = hashmap_new();
-  entrop_state_ph_t *res300, *res50, *res5, *res300b, *res50b, *res5b;
+  entrop_state_ph_t *res300 = NULL, *res50 = NULL, *res5 = NULL,
+    *res300b = NULL, *res50b = NULL, *res5b = NULL;
 
   int flag = 0;
   int neigs = (2 * opts->horizon + 1) * (2 * opts->horizon + 1);
@@ -677,10 +690,13 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       fclose(out_step_file);
     }
 
-
     if (opts -> output_data == NO_OUTPUT) {
       continue;
     }
+
+    print_bits(size, size, *frame1, out_string);
+    /* memcpy(&dbl_pholder[i * ((size + 1) * size + 1)], */
+           /* out_string, (size + 1) * size + 1); */
 
     if (i % opts->grain == 0) {
       last_compressed_size = compressed_size;
@@ -700,29 +716,28 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
         flag = 1;
       }
 
-      if (opts->joint_complexity == 1) {
-        memcpy(&dbl_pholder[(size + 1) * size + 1],
-               out_string, (size + 1) * size + 1);
+      /* if (opts->joint_complexity == 1) { */
+      /*   /\* memcpy(&dbl_pholder[size * size + 1], *\/ */
+      /*          /\* out_string, size * size + 1); *\/ */
 
-        int dbl_comp_size =
-          compress_memory_size(dbl_pholder, 2 * ((size + 1) * size + 1));
+      /*   int dbl_comp_size = */
+      /*     compress_memory_size(dbl_pholder, i * ((size + 1) * size + 1)); */
+      /*   /\* memcpy(dbl_pholder, out_string, (size + 1) * size + 1); *\/ */
 
-        memcpy(dbl_pholder, out_string, (size + 1) * size + 1);
-
-        if (i > 0) {
-          size_sum = last_compressed_size + compressed_size;
-          ratio2 = (size_sum - dbl_comp_size)/(float)size_sum;
-          ratio = ( (last_compressed_size / (float)last_cell_count) +
-                    (compressed_size / (float)cell_count) ) /
-            (dbl_comp_size / (float)(last_cell_count + cell_count));
-        }
-        fprintf(out_file, "%i    %i    %f    %f    "
-                          "%i    %i    %i\n",
-                i, compressed_size, ratio, ratio2, cell_count, last_cell_count,
-                dbl_comp_size);
-      } else {
-        fprintf(out_file, "%i    %i\n", i, compressed_size);
-      }
+      /*   if (i > 0) { */
+      /*     size_sum = last_compressed_size + compressed_size; */
+      /*     ratio2 = (size_sum - dbl_comp_size)/(float)size_sum; */
+      /*     ratio = ( (last_compressed_size / (float)last_cell_count) + */
+      /*               (compressed_size / (float)cell_count) ) / */
+      /*       (dbl_comp_size / (float)(last_cell_count + cell_count)); */
+      /*   } */
+      /*   fprintf(out_file, "%i    %i    %f    %f    " */
+      /*                     "%i    %i    %i\n", */
+      /*           i, compressed_size, ratio, ratio2, cell_count, last_cell_count, */
+      /*           dbl_comp_size); */
+      /* } else { */
+      /*   fprintf(out_file, "%i    %i\n", i, compressed_size); */
+      /* } */
 
       printf("%i  ", compressed_size);
       fflush(stdout);
@@ -730,13 +745,19 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
     int offset_a = 2, offset_b = 1;
 
-    if (i == steps - 301) {
+
+    if (i == steps - WINDOW) {
       print_bits(size, size, *frame1, out_string300);
       res300 = populate_map(map300, size, *frame1, offset_a, states);
       res300b = populate_map(map300b, size, *frame1, offset_b, states);
 
       memcpy(automat300, *frame1, size * size * sizeof(uint8_t));
     }
+    if (i > (steps - WINDOW) && (i - (steps - WINDOW)) % W_STEP == 0) {
+      memcpy(test_automata[((i - (steps - WINDOW)) / W_STEP) - 1],
+             *frame1, size * size * sizeof(uint8_t));
+    }
+
     if (i == steps - 51) {
       print_bits(size, size, *frame1, out_string50);
       res50 = populate_map(map50, size, *frame1, offset_a, states);
@@ -752,129 +773,70 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       memcpy(automat5, *frame1, size * size * sizeof(uint8_t));
     }
     if (i == steps - 1) {
-      /* asprintf(&mult_time_fname, "data_2d_%i/mult/mult%s.dat", states, rule_buf); */
-      /* mult_time_file = fopen(mult_time_fname, "w+"); */
-
-      /* print_bits(size, size, *frame1, out_string); */
-      /* memcpy(&dbl_pholder[(size + 1) * size + 1], */
-             /* out_string, (size + 1) * size + 1); */
-
-      /* memcpy(dbl_pholder, out_string300, (size + 1) * size + 1); */
-      /* dbl_cmp300 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string200, (size + 1) * size + 1); */
-      /* dbl_cmp200 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string100, (size + 1) * size + 1); */
-      /* dbl_cmp100 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string50, (size + 1) * size + 1); */
-      /* dbl_cmp50 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string10, (size + 1) * size + 1); */
-      /* dbl_cmp10 = compress_memory_size(dbl_pholder, */
-      /*                                   2 * ((size + 1) * size + 1)); */
-      /* memcpy(dbl_pholder, out_string5, (size + 1) * size + 1); */
-      /* dbl_cmp5 = compress_memory_size(dbl_pholder, */
-      /*                                  2 * ((size + 1) * size + 1)); */
-
-      /* fprintf(mult_time_file, "%i    %i    %i    %i    " */
-      /*                         "%i    %i    %i    %i    " */
-      /*                         "%i    %i    %i    %i    " */
-      /*                         "%i\n", */
-      /*         compress_memory_size(out_string, (size + 1) * size), */
-      /*         dbl_cmp5, */
-      /*         compress_memory_size(out_string5, (size + 1) * size), */
-      /*         dbl_cmp10, */
-      /*         compress_memory_size(out_string10, (size + 1) * size), */
-      /*         dbl_cmp50, */
-      /*         compress_memory_size(out_string50, (size + 1) * size), */
-      /*         dbl_cmp100, */
-      /*         compress_memory_size(out_string100, (size + 1) * size), */
-      /*         dbl_cmp200, */
-      /*         compress_memory_size(out_string200, (size + 1) * size), */
-      /*         dbl_cmp300, */
-      /*         compress_memory_size(out_string300, (size + 1) * size)); */
 
       asprintf(&entrop_fname, "data_2d_%i/ent/ent%s.dat", states, rule_buf);
       entrop_file = fopen(entrop_fname, "w+");
 
-      add_results_to_file(map300, size, *frame1, states, offset_a,
+      add_entropy_results_to_file(map300, size, *frame1, states, offset_a,
                           entrop_file, res300);
-      add_results_to_file(map50, size, *frame1, states, offset_a,
+      add_entropy_results_to_file(map50, size, *frame1, states, offset_a,
                           entrop_file, res50);
-      add_results_to_file(map5, size, *frame1, states, offset_a,
+      add_entropy_results_to_file(map5, size, *frame1, states, offset_a,
                           entrop_file, res5);
       fprintf(entrop_file, "\n");
 
 
-      add_results_to_file(map300b, size, *frame1, states, offset_b,
+      add_entropy_results_to_file(map300b, size, *frame1, states, offset_b,
                           entrop_file, res300b);
-      add_results_to_file(map50b, size, *frame1, states, offset_b,
+      add_entropy_results_to_file(map50b, size, *frame1, states, offset_b,
                           entrop_file, res50b);
-      add_results_to_file(map5b, size, *frame1, states, offset_b,
+      add_entropy_results_to_file(map5b, size, *frame1, states, offset_b,
                           entrop_file, res5b);
       fprintf(entrop_file, "\n");
 
 
-      asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf);
-      nn_file = fopen(nn_fname, "w+");
+      /* asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf); */
+      /* nn_file = fopen(nn_fname, "w+"); */
       asprintf(&fisher_fname, "data_2d_%i/nn/fisher%s.dat", states, rule_buf);
       fisher_file = fopen(fisher_fname, "w+");
 
       network_result_t res = {1.};
-      network_opts_t n_opts = {10, 60, 3, MOMENTUM, DECAY, NO_FISHER, 1};
+      network_opts_t n_opts = {10, 40, 3, MOMENTUM, DECAY, NO_FISHER, 1};
 
-      for (int i = 5; i < 6; ++i) {
-        /* n_opts.num_hid = 10; */
-        /* n_opts.offset = i; */
-        /* n_opts.fisher = NO_FISHER; */
+      for (int i = 4; i < 5; ++i) {
+        n_opts.num_hid = 10;
+        n_opts.offset = i;
+        n_opts.fisher = NO_FISHER;
 
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
-        /* results->nn_tr_300 = res.train_error; */
-        /* results->nn_te_300 = res.test_error; */
+        train_nn_on_automaton(size, states, automat300, test_automata,
+                              WINDOW / W_STEP, &n_opts, &res);
 
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
-        /* results->nn_tr_50 = res.train_error; */
-        /* results->nn_te_50 = res.test_error; */
+        /*add_nn_results_to_file(nn_file, &n_opts, &res, 50);*/
+        fprintf(fisher_file, "%f", res.error_var);
 
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
-        /* results->nn_tr_5 = res.train_error; */
-        /* results->nn_te_5 = res.test_error; */
-
-        /* n_opts.num_hid = 20; */
-        /* if (i == 1) { */
-          /* n_opts.fisher = FISHER; */
-        /* } */
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 300); */
-        /* add_fisher_results_to_file(fisher_file, &n_opts, &res, 300); */
-
-        /* n_opts.fisher = NO_FISHER; */
-
-        train_nn_on_automaton(size, states, automat50, *frame1, &n_opts, &res);
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 50); */
-        results->nn_tr_50 = res.train_error;
-        results->nn_te_50 = res.test_error;
-        train_nn_on_automaton(size, states, *frame1, NULL, &n_opts, &res);
-        results->nn_tr_300 = res.train_error;
-        /* train_nn_on_automaton(size, states, automat300, *frame1, &n_opts, &res); */
-        /* add_nn_results_to_file(nn_file, &n_opts, &res, 5); */
+        results->nn_tr_50 = res.error_var;
+        results->nn_te_50 = 1.;
       }
     }
   }
   printf("\n");
 
   /* Cleanup before finishing */
+  /* free(dbl_pholder); */
+
   free_map(map5);
   free_map(map300);
   free_map(map50);
   free_map(map5b);
   free_map(map300b);
   free_map(map50b);
+
+  if (test_automata) {
+    for (int i = 0; i < WINDOW / W_STEP; ++i) {
+      free(test_automata[i]);
+    }
+    free(test_automata);
+  }
 
   if (automat5)
     free(automat5);

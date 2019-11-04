@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include "compress.h"
@@ -46,12 +47,13 @@ void compress_in_memory(void* in_data, size_t in_data_size,
 
 int compress_memory_size(void *in_data, size_t in_data_size)
 {
-  const size_t BUFSIZE = 128 * 1024;
-  uint8_t temp_buffer[BUFSIZE];
+  const size_t BUFSIZE = 256 * 256 * 256;
+  uint8_t* temp_buffer = malloc(sizeof(char) * BUFSIZE);
   z_stream strm = {};
   compress_in_memory(in_data, in_data_size, BUFSIZE, temp_buffer, &strm);
   int compressed_size = BUFSIZE - strm.avail_out;
   deflateEnd(&strm);
+  free(temp_buffer);
 
   return compressed_size;
 }
