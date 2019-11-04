@@ -22,11 +22,13 @@ typedef struct network_result_s
   double train_error;
   double test_error;
   double fisher_info;
+  double error_var;
 } network_result_t;
 
 void train_nn_on_automaton(size_t, int,
                            uint8_t*,
-                           uint8_t*,
+                           uint8_t**,
+                           int,
                            network_opts_t*,
                            network_result_t*);
 

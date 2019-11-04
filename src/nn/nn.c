@@ -437,7 +437,8 @@ double compute_error(int num_pattern, int num_output,
 
 void train_nn_on_automaton(size_t size, int states,
                            uint8_t* train_automaton,
-                           uint8_t* test_automaton,
+                           uint8_t** test_automata,
+                           int n_tests,
                            network_opts_t* opts,
                            network_result_t* res)
 {
@@ -461,7 +462,8 @@ void train_nn_on_automaton(size_t size, int states,
   /* Regression parameter */
   double reg = 0.;
 
-  /* ===== Network and training variables declaration ===== */
+  /* ====== Network and training variables declaration ====== */
+
   /* num_pattern x (num_input + 1) array that holds all the training set */
   double* base_input =
     (double *) malloc(num_pattern * (num_input + 1) * sizeof(double));
@@ -505,8 +507,9 @@ void train_nn_on_automaton(size_t size, int states,
   int epoch;
   size_t random_idx[num_pattern];
   double test_error = 0.0;
+  double test_var = 0.0;
 
-  /* ================= End declarations ================== */
+  /* ===================== End declarations ====================== */
 
   /* Initialize the weights of the network */
   init_weights(num_hidden, num_input, num_output,
@@ -558,7 +561,7 @@ void train_nn_on_automaton(size_t size, int states,
                      alpha, weight_ih, delta_w_ih, delta_w_ih_prev, weight_ho,
                      delta_w_ho, delta_w_ho_prev);
 
-      /* Error is only updated here because it might be changed by
+      /* Error is only updated here because it might have been changed by
          `update_weights` */
       error += batch_error * batch_size;
     }
@@ -585,19 +588,35 @@ void train_nn_on_automaton(size_t size, int states,
                                       base_input, weight_ih, weight_ho);
   }
 
-  if (test_automaton != NULL) {
-    /* Fill the placeholders with test data */
-    fill_input_target(size, test_input, test_target,
-                      test_automaton, opts->offset, states);
+  /* Was an array of states to test on provided ? */
+  if (test_automata != NULL) {
+    double test_errors[n_tests];
+    for (int i = 0; i < n_tests; ++i) {
+      /* Fill the placeholders with test data */
+      fill_input_target(size, test_input, test_target,
+                        test_automata[i], opts->offset, states);
 
-    /* Compute error on the test set */
-    test_error = compute_error(num_pattern, num_output, num_hidden,
-                               num_input, test_input, test_target,
-                               weight_ih, weight_ho);
+      /* Compute error on the test set */
+      test_errors[i] = compute_error(num_pattern, num_output, num_hidden,
+                                     num_input, test_input, test_target,
+                                     weight_ih, weight_ho);
+      test_error += error / test_errors[i];
+    }
+
+    /* Average score across all tested states */
+    test_error /= n_tests;
+
+    /* Compute variance of scores */
+    for (int i = 0; i < n_tests; ++i) {
+      test_var += (error / test_errors[i] - test_error)
+        * (error / test_errors[i] - test_error);
+    }
+    test_var /= n_tests;
+    test_var = sqrt(test_var);
 
     if (opts->verbosity >= 1) {
-      fprintf(stdout, "\tTest error: %f\tRatio: %f\tDiff: %f",
-              test_error, error/test_error, test_error - error);
+      fprintf(stdout, "\tTest error: %f\tVar: %f\tRatio: %f",
+              error / test_error, test_var, test_error);
     }
   }
 
@@ -610,9 +629,11 @@ void train_nn_on_automaton(size_t size, int states,
 
   /* Output data */
   res->train_error = error;
-  res->test_error = test_error;
+  res->test_error = error / test_error;
+  res->error_var = test_var;
 
   /* Cleanup allocated arrays */
+  free(target);
   free(base_input);
   free(test_input);
   free(test_target);
