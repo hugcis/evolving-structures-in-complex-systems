@@ -31,7 +31,7 @@ double compute_score(results_nn_t* res)
   }
   /* Everything went well */
   else {
-    return (res->nn_tr_50 + res->nn_tr_300) / (2 * res->nn_te_50);
+    return res->nn_tr_50;
   }
 }
 
@@ -111,7 +111,7 @@ void iterative_search(int n_simulations, int input_flag,
       make_map(opts, rule_buf, i);
 
       res.nn_tr_5 = 1.;
-      res.nn_tr_50 = 1.;
+      res.nn_tr_50 = 0.;
       res.nn_tr_300 = 1.;
       res.nn_te_5 = 1.;
       res.nn_te_50 = 1.;
@@ -137,7 +137,7 @@ void iterative_search(int n_simulations, int input_flag,
         make_map(opts, rule_buf, i);
 
         res.nn_tr_5 = 1.;
-        res.nn_tr_50 = 1.;
+        res.nn_tr_50 = 0.;
         res.nn_tr_300 = 1.;
         res.nn_te_5 = 1.;
         res.nn_te_50 = 1.;
