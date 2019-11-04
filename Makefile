@@ -30,7 +30,7 @@ directories:
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
 	$(MKDIR) $(BUILDDIR)
-	$(CC) $(CFLAGS) $+ -c -o $@
+	$(CC) $(CFLAGS) $(XCFLAGS) $+ -c -o $@
 
 .PHONY: clean
 clean:
