@@ -51,8 +51,8 @@ typedef struct results_nn_s
 
 
 typedef void (*ProcessF)(size_t size, uint8_t*,
-                         uint8_t[] , uint8_t* ,
-                         int, int, uint32_t*);
+                         uint8_t[], uint8_t*,
+                         int, uint32_t*);
 
 unsigned long hash(char*);
 
@@ -64,20 +64,10 @@ unsigned long hash(char*);
 void process_rule(uint64_t grule_size,
                   uint8_t rule[grule_size],
                   char rule_buf[],
-                  int, long,
+                  long,
                   struct Options2D*,
                   results_nn_t*);
 
-/**
- * @brief Update the automaton state with rule.
- *
- * This function updates an automaton `A` with rule `rule`.
- */
-void update_step_general(size_t size,
-                         uint8_t*,
-                         uint8_t*,
-                         uint8_t*,
-                         int, int, uint32_t*);
 
 void generate_general_rule(uint64_t grule_size,
                            uint8_t rule_array[grule_size],

@@ -118,7 +118,7 @@ void iterative_search(int n_simulations, int input_flag,
       res.nn_te_300 = 1.;
 
       process_rule(grule_size, population[k],
-                   rule_buf, 0, timesteps,
+                   rule_buf, timesteps,
                    opts, &res);
 
       results[k * (n_children + 1) + n_children].index =
@@ -144,7 +144,7 @@ void iterative_search(int n_simulations, int input_flag,
         res.nn_te_300 = 1.;
 
         process_rule(grule_size, children[k * n_children + d],
-                     rule_buf, 0, timesteps, opts, &res);
+                     rule_buf, timesteps, opts, &res);
 
         results[k * (n_children + 1) + d].index = k * (n_children + 1) + d;
         results[k * (n_children + 1) + d].value = compute_score(&res);

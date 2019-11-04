@@ -6,7 +6,7 @@
 #include <inttypes.h>
 #include <ctype.h>
 #include "automaton/2d_automaton.h"
-#include "rule.h"
+#include "automaton/rule.h"
 #include "nn/nn.h"
 #include "utils/compress.h"
 #include "utils/utils.h"

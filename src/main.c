@@ -259,7 +259,7 @@ Options:\n\
     make_map(&opts, rule_buf, 0);
 
     opts.save_steps = 1;
-    process_rule(grule_size, rule_array, rule_buf, 0, timesteps, &opts, &res);
+    process_rule(grule_size, rule_array, rule_buf, timesteps, &opts, &res);
     free(rule_array);
     free(rule_buf);
     return 0;
@@ -282,7 +282,7 @@ Options:\n\
 
       results_nn_t res;
       opts.save_steps = 0;
-      process_rule(grule_size, rule_array, rule_buf, 0, timesteps, &opts, &res);
+      process_rule(grule_size, rule_array, rule_buf, timesteps, &opts, &res);
     }
   }
 
