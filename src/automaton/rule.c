@@ -124,7 +124,13 @@ void symmetrize_rule(uint64_t grule_size,
 }
 
 /**
- * Build a rule from the provided command-line arguments.
+ * @brief Build a rule from the provided command-line arguments.
+ * @param grule_size The size of the rule.
+ * @param rule_array The array holding the rule.
+ * @param rule_buf A mirror buffer containing a string representation of the
+ *                 rule.
+ * @param rule_arg The string from which the rule is read.
+ * @param states Number of expected states in the rule.
  */
 void build_rule_from_args(uint64_t grule_size,
                           uint8_t rule_array[grule_size],
@@ -162,14 +168,13 @@ void generate_general_rule(uint64_t grule_size,
 {
   int inc;
 
-  /* Choose lambda parameter at random as well as the proportion of */
-  /* transitions to other states */
-
+  /* Choose lambda parameter at random as well as the proportion of
+     transitions to other states */
   double alphas[states];
   double theta[states], lambda[states - 1], rand_num;
 
-  /* This method samples the transition probability simplex according to a */
-  /* Dirichlet distribution with parameter D_CONST */
+  /* This method samples the transition probability simplex according to a
+     Dirichlet distribution with parameter D_CONST */
   if (DIRICHLET == 1) {
     const gsl_rng_type * T;
 
