@@ -5,8 +5,8 @@
 #include <time.h>
 #include <inttypes.h>
 #include <ctype.h>
-#include "2d_automaton.h"
-#include "automaton/rule.h"
+#include "automaton/2d_automaton.h"
+#include "rule.h"
 #include "nn/nn.h"
 #include "utils/compress.h"
 #include "utils/utils.h"
@@ -152,8 +152,8 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
           && ch == '='
           && (ch = fgetc(pattern_file)) != EOF
           && isdigit(ch) != 0) {
-        for (int i = 0; i < size; ++i) {
-          for (int j = 0; j < size; ++j) {
+        for (size_t i = 0; i < size; ++i) {
+          for (size_t j = 0; j < size; ++j) {
             a[i * size + j] = (uint8_t)(ch - '0');
           }
         }
@@ -181,7 +181,7 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
 void update_step_general(size_t size,
                          uint8_t* autom,
                          uint8_t* rule,
-                         uint8_t* last_autom, int states,
+                         uint8_t* last_autom,
                          int horizon,
                          uint32_t* pows)
 {
@@ -263,34 +263,6 @@ void update_step_general(size_t size,
   }
 }
 
-/**
- * Obsolete update function to work with totalistic rules
- */
-void update_step_totalistic(size_t size,
-                            uint8_t* base,
-                            uint8_t* rule,
-                            uint8_t* A, int states,
-                            int horizon, uint32_t* pow)
-{
-  int count;
-  memcpy(A, base, size * size * sizeof(uint8_t));
-
-  for (size_t i = 0; i < size; i++) {
-    for (size_t j = 0; j < size; j++) {
-      count = 0;
-      for (int k = - horizon; k <= horizon; k++) {
-        for (int l = - horizon; l <= horizon; l++) {
-          if (k != 0 | l != 0) {
-            count += base[((i + k + size) % size) * size
-                          + ((j + l + size) % size)];
-          }
-        }
-      }
-      A[i * size + j] = rule[states * count + base[i * size + j]];
-    }
-  }
-  memcpy(base, A, size * size * sizeof(uint8_t));
-}
 
 /**
  * Count the cells in each state and return the minority state cell count
@@ -538,7 +510,7 @@ void random_noise(size_t size, uint8_t* automaton, int states, double rate)
  */
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[],
-                  int totalistic, long steps,
+                  long steps,
                   struct Options2D* opts, results_nn_t* results)
 {
   int states = opts->states;
@@ -567,8 +539,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   /* float ratio = 0; */
   /* float ratio2 = 0; */
 
-  ProcessF process_function = totalistic == 1 ?
-    update_step_totalistic: update_step_general;
+  ProcessF process_function = update_step_general;
 
 
   uint8_t* (*frame1) = malloc(sizeof(uint8_t* (*)));
@@ -656,11 +627,11 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
     /* Macro to profile if flag is on */
     PROF(
-    process_function(size, *frame2, rule, *frame1, states, opts->horizon, pows);
-    /* Swap pointers */
-    temp_frame = frame1;
-    frame1 = frame2;
-    frame2 = temp_frame;
+      process_function(size, *frame2, rule, *frame1, opts->horizon, pows);
+      /* Swap pointers */
+      temp_frame = frame1;
+      frame1 = frame2;
+      frame2 = temp_frame;
     )
 
     if (opts->mask == MASK) {
@@ -800,7 +771,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       asprintf(&fisher_fname, "data_2d_%i/nn/fisher%s.dat", states, rule_buf);
       fisher_file = fopen(fisher_fname, "w+");
 
-      network_result_t res = {1.};
+      network_result_t res = {1., 1., 1., 0.};
       network_opts_t n_opts = {10, 40, 3, MOMENTUM, DECAY, NO_FISHER, 1};
 
       for (int i = 4; i < 5; ++i) {
