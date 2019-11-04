@@ -215,29 +215,29 @@ Options:\n\
   /* If input was given, it was either directly inline or via a file */
   if (input_fname) {
     FILE* rule_file;
-
     if ((rule_file = fopen(input_fname, "r"))) {
       uint64_t count = 0;
+      /* Read the file and put each number in rule_array */
       while ((c = getc(rule_file)) != EOF && count < grule_size) {
         rule_array[count] = (uint8_t)(c - '0');
         rule_buf[count] = c;
         count++;
       }
+      rule_buf[count] = '\0'; /* Terminate string buffer */
 
-      rule_buf[count] = '\0';
-
+      /* Incorrect number of transitions */
       if (count != grule_size) {
         fprintf(stderr, wrong_transitions, input_fname,
                 count, grule_size);
         exit(EXIT_FAILURE);
       }
-
     }
     else {
       fprintf(stderr, "Error while opening file %s: %s\n", input_fname,
               strerror(errno));
       exit(EXIT_FAILURE);
     }
+
     free(input_fname);
   }
   /* Input given inline */
