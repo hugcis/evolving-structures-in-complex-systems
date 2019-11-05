@@ -1,9 +1,0 @@
-# Rule that are like GoL (outer totalistic 224 --- 00 0000 0000 1110 0000)
-(Some small persistent structures evolve indepently, overall universe is sparse
-but many structures interact)
-
-Rule 254960
-... TO ...
-Rule 254975 -> GoL bit flip (11 1110 0011 1111 1111)
-
-And all the reversed bit-flipped rules of the ones above.
