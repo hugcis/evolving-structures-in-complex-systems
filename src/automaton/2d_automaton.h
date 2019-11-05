@@ -19,6 +19,7 @@ enum DataOutput { OUTPUT, NO_OUTPUT };
  *  rule.
  */
 struct Options2D {
+  char data_dir_name[64];
   size_t size; /**< The size of the square grid. */
   int grain_write; /**< The grain at which write operations are executed. */
   int grain; /**< The grain at which compression is done. */

@@ -29,6 +29,7 @@
 #define WINDOW 501
 #define W_STEP 13
 
+
 typedef struct masking_element
 {
   uint8_t state;
@@ -288,15 +289,15 @@ int count_cells(size_t size, uint8_t* A, int states)
 int normalize_probs(any_t states, any_t data)
 {
   data_struct_t* in = (data_struct_t*) data;
-  int st = *(int*)states;
+  int n_st = *(int*)states;
   double sum = 0;
-  for (int i = 0; i < st; i++) {
+  for (int i = 0; i < n_st; i++) {
     if (in->number_array[i] == 0.0) {
       in->number_array[i] += 1E-3;
     }
     sum += in->number_array[i];
   }
-  for (int i = 0; i < st; i++) {
+  for (int i = 0; i < n_st; i++) {
     in->number_array[i] /= sum;
   }
   return MAP_OK;
@@ -511,7 +512,8 @@ void random_noise(size_t size, uint8_t* automaton, int states, double rate)
 void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
                   char rule_buf[],
                   long steps,
-                  struct Options2D* opts, results_nn_t* results)
+                  struct Options2D* opts,
+                  results_nn_t* results)
 {
   int states = opts->states;
   size_t size = opts->size;
@@ -535,12 +537,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   int compressed_size;
   int last_cell_count;
   int cell_count = 0;
-  /* int size_sum; */
-  /* float ratio = 0; */
-  /* float ratio2 = 0; */
 
   ProcessF process_function = update_step_general;
-
 
   uint8_t* (*frame1) = malloc(sizeof(uint8_t* (*)));
   *frame1 = (uint8_t*) malloc(size * size * sizeof(uint8_t));
@@ -602,6 +600,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
   int flag = 0;
   int neigs = (2 * opts->horizon + 1) * (2 * opts->horizon + 1);
+
+
   #if PROFILE
   clock_t t = 0;
   #endif
@@ -613,9 +613,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
   for (int i = 0; i < steps; ++i) {
 
-    /* if ((i + 1) % opts->noise_step == 0) { */
-    /*   random_noise(size, frame1, states, opts->noise_rate); */
-    /* } */
     if (i % 20 == 0 && opts->mask == MASK) {
       make_mask(pert, mask, size, opts->states);
     }
@@ -651,8 +648,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
         asprintf(&step_fname, "%s/tmp_%i.step", opts->out_step_dir, i);
       }
       else {
-        asprintf(&step_fname, "data_2d_%i/steps/out%s_%i.step",
-                 states, rule_buf, i);
+        asprintf(&step_fname, "%s/steps/out%s_%i.step",
+                 opts->data_dir_name, rule_buf, i);
       }
 
       out_step_file = fopen(step_fname, "w+");

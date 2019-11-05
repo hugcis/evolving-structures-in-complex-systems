@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <getopt.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "automaton/2d_automaton.h"
 #include "automaton/rule.h"
 #include "automaton/wolfram_automaton.h"
@@ -14,9 +16,44 @@
 #define MAJOR 0
 #define MINOR 1
 
-extern int errno ;
+extern int errno;
+static struct stat st = {0};
 
 const char help[] = "Use with either 2d or 1d as first argument";
+
+void test_and_create_subdir(char* buf, char* format_string, char* arg) {
+  sprintf(buf, format_string, arg);
+  if (stat(buf, &st) == -1) {
+    if (mkdir(buf, 0777))
+      perror(buf);
+  }
+}
+
+int create_tree(struct Options2D* opts, char* base_dir_name) {
+  /* Make sure `data_2d_n` directory exixts */
+  sprintf(opts->data_dir_name, base_dir_name, opts->states);
+  if (stat(opts->data_dir_name, &st) == -1) {
+    if (mkdir(opts->data_dir_name, 0777))
+      perror(opts->data_dir_name);
+  }
+  /* Make sure step dir exists */
+  if (stat(opts->out_step_dir, &st) == -1) {
+    if (mkdir(opts->out_step_dir, 0777))
+      perror(opts->out_step_dir);
+  }
+
+  char buf[64];
+  test_and_create_subdir(buf, "%s/map", opts->data_dir_name);
+  test_and_create_subdir(buf, "%s/ent", opts->data_dir_name);
+  test_and_create_subdir(buf, "%s/nn", opts->data_dir_name);
+  test_and_create_subdir(buf, "%s/out", opts->data_dir_name);
+  test_and_create_subdir(buf, "%s/steps", opts->data_dir_name);
+  test_and_create_subdir(buf, "%s/var", opts->data_dir_name);
+  test_and_create_subdir(buf, "%s/mult", opts->data_dir_name);
+
+  return 1;
+}
+
 
 int main_2d(int argc, char** argv)
 {
@@ -51,6 +88,7 @@ Options:\n\
     " transitions found but %"PRIu64" were expected.\n";
   char too_large_init[] = "Initialization zone size is too large: %l was given"
     " but size is %lu.\n";
+  char base_dir_name[] = "data_2d_%i";
 
   extern char *optarg;
   extern int optind;
@@ -111,6 +149,7 @@ Options:\n\
     if (c == -1)
       break;
 
+    /* Parse arguments */
     switch (c) {
     case 'r':
       search = 1;
@@ -194,6 +233,9 @@ Options:\n\
     }
   }
 
+  create_tree(&opts, base_dir_name);
+
+  /* Check init zone is smaller than the size of the automaton */
   if (opts.init_type >= (long) opts.size) {
     fprintf(stderr, too_large_init, opts.init_type, opts.size);
     exit(EXIT_FAILURE);
