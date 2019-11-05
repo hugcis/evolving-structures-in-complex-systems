@@ -68,7 +68,7 @@ void iterative_search(int n_simulations, int input_flag,
     }
     /* Initialize search */
     if (i == 0) {
-      asprintf(&genealogy_fname, "data_2d_%i/nn/%lu.gen", opts->states,
+      asprintf(&genealogy_fname, "%s/nn/%lu.gen", opts->data_dir_name,
                hash(rule_buf));
       genealogy_file = fopen(genealogy_fname, "w+");
 

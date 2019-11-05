@@ -258,7 +258,7 @@ void make_map(struct Options2D* opts, char* rule_buf, int step)
   FILE* dic_file;
   char* fname;
 
-  asprintf(&fname, "data_2d_%i/map/%lu.map", opts->states, hash(rule_buf));
+  asprintf(&fname, "%s/map/%lu.map", opts->data_dir_name, hash(rule_buf));
   dic_file = fopen(fname, "w+");
 
   if (dic_file == NULL) {
