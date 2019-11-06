@@ -763,8 +763,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       fprintf(entrop_file, "\n");
 
 
-      /* asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf); */
-      /* nn_file = fopen(nn_fname, "w+"); */
+      asprintf(&nn_fname, "data_2d_%i/nn/nn%s.dat", states, rule_buf);
+      nn_file = fopen(nn_fname, "w+");
+
       asprintf(&fisher_fname, "data_2d_%i/nn/fisher%s.dat", states, rule_buf);
       fisher_file = fopen(fisher_fname, "w+");
 
