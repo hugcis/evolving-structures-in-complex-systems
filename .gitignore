@@ -1,8 +1,8 @@
 data*/
 step*/
-figures/
 rule_gif/
 bin/
 build/
 doc/html/*
 doc/latex/*
+tools/viz/step_to_ppm
