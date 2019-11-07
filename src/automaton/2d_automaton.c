@@ -570,8 +570,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     (uint8_t**) malloc(sizeof(uint8_t*) * (WINDOW / W_STEP));
 
   if (opts->output_data != NO_OUTPUT) {
-    /* asprintf(&fname, "data_2d_%i/out/out%s.dat", states, rule_buf); */
-    /* out_file = fopen(fname, "w+"); */
+    asprintf(&fname, "%s/out/out%s.dat", opts->data_dir_name, rule_buf);
+    out_file = fopen(fname, "w+");
 
     automat5 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
     automat50 = (uint8_t*) calloc(size * size, sizeof(uint8_t));
@@ -582,8 +582,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     }
   }
 
-  /* char* dbl_pholder = (char*) */
-    /* malloc(sizeof(char) * (steps  * ((size + 1) * size + 1))); */
   char out_string[(size + 1) * size + 1];
   char out_string300[(size + 1) * size + 1];
   char out_string50[(size + 1) * size + 1];
@@ -631,6 +629,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       frame2 = temp_frame;
     )
 
+    /* Masking */
     if (opts->mask == MASK) {
       mask_autom(pert, size, mask, *frame1);
     }
@@ -658,13 +657,11 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       fclose(out_step_file);
     }
 
-    if (opts -> output_data == NO_OUTPUT) {
+    if (opts->output_data == NO_OUTPUT) {
       continue;
     }
 
     print_bits(size, size, *frame1, out_string);
-    /* memcpy(&dbl_pholder[i * ((size + 1) * size + 1)], */
-           /* out_string, (size + 1) * size + 1); */
 
     if (i % opts->grain == 0) {
       last_compressed_size = compressed_size;
@@ -673,6 +670,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       print_bits(size, size, *frame1, out_string);
       compressed_size = compress_memory_size(out_string, (size + 1) * size);
       cell_count = count_cells(size, *frame1, states);
+
 
       /* Check if state has evolved from last time (stop mechanism) */
       if (compressed_size == last_compressed_size
@@ -684,28 +682,28 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
         flag = 1;
       }
 
-      /* if (opts->joint_complexity == 1) { */
-      /*   /\* memcpy(&dbl_pholder[size * size + 1], *\/ */
-      /*          /\* out_string, size * size + 1); *\/ */
+      if (opts->joint_complexity == 1) {
+        /* memcpy(&dbl_pholder[size * size + 1], */
+               /* out_string, size * size + 1); */
 
-      /*   int dbl_comp_size = */
-      /*     compress_memory_size(dbl_pholder, i * ((size + 1) * size + 1)); */
-      /*   /\* memcpy(dbl_pholder, out_string, (size + 1) * size + 1); *\/ */
+        int dbl_comp_size =
+          compress_memory_size(dbl_pholder, i * ((size + 1) * size + 1));
+        /* memcpy(dbl_pholder, out_string, (size + 1) * size + 1); */
 
-      /*   if (i > 0) { */
-      /*     size_sum = last_compressed_size + compressed_size; */
-      /*     ratio2 = (size_sum - dbl_comp_size)/(float)size_sum; */
-      /*     ratio = ( (last_compressed_size / (float)last_cell_count) + */
-      /*               (compressed_size / (float)cell_count) ) / */
-      /*       (dbl_comp_size / (float)(last_cell_count + cell_count)); */
-      /*   } */
-      /*   fprintf(out_file, "%i    %i    %f    %f    " */
-      /*                     "%i    %i    %i\n", */
-      /*           i, compressed_size, ratio, ratio2, cell_count, last_cell_count, */
-      /*           dbl_comp_size); */
-      /* } else { */
-      /*   fprintf(out_file, "%i    %i\n", i, compressed_size); */
-      /* } */
+        if (i > 0) {
+          size_sum = last_compressed_size + compressed_size;
+          ratio2 = (size_sum - dbl_comp_size)/(float)size_sum;
+          ratio = ( (last_compressed_size / (float)last_cell_count) +
+                    (compressed_size / (float)cell_count) ) /
+            (dbl_comp_size / (float)(last_cell_count + cell_count));
+        }
+        fprintf(out_file, "%i    %i    %f    %f    "
+                          "%i    %i    %i\n",
+                i, compressed_size, ratio, ratio2, cell_count, last_cell_count,
+                dbl_comp_size);
+      } else {
+        fprintf(out_file, "%i    %i\n", i, compressed_size);
+      }
 
       printf("%i  ", compressed_size);
       fflush(stdout);
@@ -780,7 +778,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
         train_nn_on_automaton(size, states, automat300, test_automata,
                               WINDOW / W_STEP, &n_opts, &res);
 
-        /*add_nn_results_to_file(nn_file, &n_opts, &res, 50);*/
+        add_nn_results_to_file(nn_file, &n_opts, &res, 50);
         fprintf(fisher_file, "%f", res.error_var);
 
         results->nn_tr_50 = res.error_var;
@@ -791,8 +789,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
   printf("\n");
 
   /* Cleanup before finishing */
-  /* free(dbl_pholder); */
-
   free_map(map5);
   free_map(map300);
   free_map(map50);
