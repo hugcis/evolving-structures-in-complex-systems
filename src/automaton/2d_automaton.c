@@ -506,6 +506,36 @@ void random_noise(size_t size, uint8_t* automaton, int states, double rate)
   }
 }
 
+void compress_double(int step, FILE* out_file,
+                     char* dbl_pholder, size_t size, char* out_string,
+                     int compressed_size, int last_compressed_size,
+                     int cell_count, int last_cell_count)
+{
+  double ratio = 0., ratio2 = 0.;
+  int size_sum;
+
+  memcpy(&dbl_pholder[size * size + 1],
+         out_string, size * size + 1);
+
+  int dbl_comp_size =
+    compress_memory_size(dbl_pholder, step * ((size + 1) * size + 1));
+  memcpy(dbl_pholder, out_string, (size + 1) * size + 1);
+
+  if (step > 0) {
+    size_sum = last_compressed_size + compressed_size;
+    ratio2 = (size_sum - dbl_comp_size)/(float)size_sum;
+    ratio = ( (last_compressed_size / (float)last_cell_count) +
+              (compressed_size / (float)cell_count) ) /
+      (dbl_comp_size / (float)(last_cell_count + cell_count));
+  }
+  fprintf(out_file, "%i    %i    %f    %f    "
+          "%i    %i    %i\n",
+          step, compressed_size, ratio, ratio2,
+          cell_count, last_cell_count,
+          dbl_comp_size);
+
+}
+
 /**
  * Main entrypoint that handles all the automaton processing.
  */
@@ -582,6 +612,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     }
   }
 
+  char* dbl_pholder = (char*)
+    malloc(sizeof(char) * (steps  * ((size + 1) * size + 1)));
   char out_string[(size + 1) * size + 1];
   char out_string300[(size + 1) * size + 1];
   char out_string50[(size + 1) * size + 1];
@@ -598,7 +630,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
   int flag = 0;
   int neigs = (2 * opts->horizon + 1) * (2 * opts->horizon + 1);
-
 
   #if PROFILE
   clock_t t = 0;
@@ -618,10 +649,16 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     if (opts->mask == MASK) {
       mask_autom(pert, size, mask, *frame1);
     }
-    /* Make update from frame1 to frame2 */
+
+    if (opts->joint_complexity == 1) {
+      print_bits(size, size, *frame1, out_string);
+      memcpy(&dbl_pholder[i * ((size + 1) * size + 1)],
+            out_string, (size + 1) * size + 1);
+    }
 
     /* Macro to profile if flag is on */
     PROF(
+      /* Make update from frame1 to frame2 */
       process_function(size, *frame2, rule, *frame1, opts->horizon, pows);
       /* Swap pointers */
       temp_frame = frame1;
@@ -661,7 +698,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       continue;
     }
 
-    print_bits(size, size, *frame1, out_string);
 
     if (i % opts->grain == 0) {
       last_compressed_size = compressed_size;
@@ -670,7 +706,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       print_bits(size, size, *frame1, out_string);
       compressed_size = compress_memory_size(out_string, (size + 1) * size);
       cell_count = count_cells(size, *frame1, states);
-
 
       /* Check if state has evolved from last time (stop mechanism) */
       if (compressed_size == last_compressed_size
@@ -683,24 +718,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       }
 
       if (opts->joint_complexity == 1) {
-        /* memcpy(&dbl_pholder[size * size + 1], */
-               /* out_string, size * size + 1); */
-
-        int dbl_comp_size =
-          compress_memory_size(dbl_pholder, i * ((size + 1) * size + 1));
-        /* memcpy(dbl_pholder, out_string, (size + 1) * size + 1); */
-
-        if (i > 0) {
-          size_sum = last_compressed_size + compressed_size;
-          ratio2 = (size_sum - dbl_comp_size)/(float)size_sum;
-          ratio = ( (last_compressed_size / (float)last_cell_count) +
-                    (compressed_size / (float)cell_count) ) /
-            (dbl_comp_size / (float)(last_cell_count + cell_count));
-        }
-        fprintf(out_file, "%i    %i    %f    %f    "
-                          "%i    %i    %i\n",
-                i, compressed_size, ratio, ratio2, cell_count, last_cell_count,
-                dbl_comp_size);
+        compress_double(i, out_file, dbl_pholder, size, out_string,
+                        compressed_size, last_compressed_size,
+                        cell_count, last_cell_count);
       } else {
         fprintf(out_file, "%i    %i\n", i, compressed_size);
       }
@@ -710,7 +730,6 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     }
 
     int offset_a = 2, offset_b = 1;
-
 
     if (i == steps - WINDOW) {
       print_bits(size, size, *frame1, out_string300);
