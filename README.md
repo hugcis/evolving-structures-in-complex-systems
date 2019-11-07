@@ -28,8 +28,7 @@ incrementing in a row-first manner a __base-N counter__ with __8 cells__.
 
 Mapping files just enumerate the resulting state of the middle cell for the
 corresponding neighborhood state. There are <img
-src="https://render.githubusercontent.com/render/math?math=(N %2B 1)^{\left((N
-%2B 1)^8\right)}"> possible 3x3 neighborhoods rules.
+src="figures/eq1.png" height=20px> possible 3x3 neighborhoods rules.
 
 #### Obtaining the rule files
 
