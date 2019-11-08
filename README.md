@@ -11,7 +11,9 @@ The provided C library implements a general cellular automaton simulator and all
 the steps for computing the metrics we discuss in the paper.
 
 The library can be built with
-```make all```
+```
+make all
+```
 which will create a binary in `bin/automaton`.
 
 ### Generate automata
@@ -42,7 +44,9 @@ that correspond to the training and testing sets used in the paper.
 
 Once the `maps` directory is placed at the root of this directory, running 
 
-```./scripts/generate_results_from_maps.sh```
+```
+./scripts/generate_results_from_maps.sh
+```
 
 will simulate all automata from the maps and compute the various metrics we
 discuss in the paper (this might take a while to complete). The script calls the
@@ -98,7 +102,6 @@ number of steps, etc. The patterns will be centered in the middle of the
 automaton for easier visualization.
 
 As an example, the following command that uses the pattern above
-
 ```bash
 tools/viz/generate_frames.sh -n 4 \
                              -t 300 \
@@ -108,6 +111,6 @@ tools/viz/generate_frames.sh -n 4 \
                              -s 32 \
                              1685000103177278144
 ```
-produces
+produces the GIF
 
 [Spaceship](figures/ex_spaceship.gif)
