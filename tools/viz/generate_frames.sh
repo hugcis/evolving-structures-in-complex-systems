@@ -2,8 +2,6 @@
 #
 # This script will run a simulation of a cellular automaton specified by the
 # rule hash and number of states and generate a gif file of its evolution.
-# TODO: add support for options in both the bin/automaton executable and the
-#       python script.
 
 STATES=3;
 TIME=1000;
@@ -13,8 +11,25 @@ DELAY=30;
 Q="";
 PAT="";
 
-# A POSIX variable
-OPTIND=1         # Reset in case getopts has been used previously in the shell.
+OPTIND=1  # Reset in case getopts has been used previously in the shell.
+
+show_help() {
+    echo "\
+Visualization tool for generating cellular automata GIF evolution.\n\n\
+Usage:\n\
+    tools/viz/generate_frames.sh [options] [rule_number|file_location]\n\
+\n\
+Options:\n\
+    -h                 Print this message.\n\
+    -t <time>          Number of time steps of the simulation \n\
+                       (default: 1000).\n\
+    -s <size>          Size of the automaton being simulated (default: 256).\n\
+    -g <grain>         Grain of the final GIF image - one image every\n\
+                       grain steps (default: 50).\n\
+    -d <delay>         GIF delay parameter (default: 30).\n\
+    -n <states>        Number of states of the automaton (default: 3).\n\
+    -j <pattern_file>  Pattern to load for simulation.\n"
+}
 
 while getopts "h?qd:g:s:t:n:j:" opt; do
     case "$opt" in
