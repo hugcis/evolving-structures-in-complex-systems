@@ -125,6 +125,7 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
   char ch; /* Character placeholder for the file */
   int pattern_start = 0; /* Flag indicating wether we are reading the header
                             or the pattern */
+  int bg = 0;
   size_t x = size/2, y = size/2; /* Pattern's upper left corner is the center
                                     of the automaton */
 
@@ -152,12 +153,17 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
           && (ch = fgetc(pattern_file)) != EOF
           && ch == '='
           && (ch = fgetc(pattern_file)) != EOF
-          && isdigit(ch) != 0) {
+          && isdigit(ch) != 0
+          && bg == 0) {
+        bg = 1;
         for (size_t i = 0; i < size; ++i) {
           for (size_t j = 0; j < size; ++j) {
             a[i * size + j] = (uint8_t)(ch - '0');
           }
         }
+      }
+      else {
+        return -1;
       }
       break;
     default:
@@ -170,6 +176,14 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
       break;
     }
   }
+
+  /* If BG was not given, initialize all to 0 */
+  for (size_t i = 0; i < size; ++i) {
+    for (size_t j = 0; j < size; ++j) {
+      a[i * size + j] = (uint8_t)0;
+    }
+  }
+
 
   fclose(pattern_file);
   return pattern_start;
@@ -591,7 +605,9 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     fprintf(stderr, "Error parsing initialization pattern\n");
     exit(EXIT_FAILURE);
   }
+
   memcpy(*frame2, *frame1, size * size * sizeof(uint8_t));
+
   uint8_t* automat5 = NULL;
   uint8_t* automat50 = NULL;
   uint8_t* automat300 = NULL;

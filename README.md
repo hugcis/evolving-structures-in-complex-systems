@@ -71,5 +71,43 @@ Automata evolution can be visualized by generating a GIF image with the script
 
 ## Playing with patterns
 
-The library supports specifying a initial pattern.
+The library supports specifying a initial pattern for a simulation. Patterns can
+be defined with a specific file format, of which an example is given below.
 
+```
+N=4
+R=1685000103177278144
+BG=1
+#
+13231
+11111
+01110
+13231
+11111
+22022
+#
+```
+
+The quantity after `N` is the number of states, the one after `R` is the rule
+ID. `BG` is an optional value to set all cells not specified in the pattern to a
+given state. The pattern itself is delimited by `#` characters, and is just a
+rectangle with, for each cell of the pattern, the corresponding state.
+
+When simulating a pattern, one can still choose the size of the automaton, the
+number of steps, etc. The patterns will be centered in the middle of the
+automaton for easier visualization.
+
+As an example, the following command that uses the pattern above
+
+```bash
+tools/viz/generate_frames.sh -n 4 \
+                             -t 300 \
+                             -g 1 \
+                             -d 5 \
+                             -j example_patterns/spaceships_4.pat \
+                             -s 32 \
+                             1685000103177278144
+```
+produces
+
+[Spaceship](figures/ex_spaceship.gif)
