@@ -45,16 +45,21 @@ shift $((OPTIND-1))
 
 tmpdir=$(mktemp -d)
 
-./bin/automaton 2d --n_states $STATES --temp_output\
-                --input_file "data_2d_$STATES/map/$@.map"\
+if echo $@ |grep --quiet -e '[0-9]\+\b'; then
+    INPUT="$PWD/data_2d_$STATES/map/$@.map"
+else
+    INPUT=$@
+fi
+
+./bin/automaton 2d --n_states $STATES\
+                --temp_output\
+                --input_file $INPUT\
                 --timesteps $TIME\
                 --size $SIZE --write_grain $GRAIN\
                 $Q --early_stopping --output $tmpdir $PAT ||
     { echo 'Failure during automaton simulation'; exit 1; }
 
-./make_frames.sh $tmpdir $DELAY $SIZE $STATES $TIME $GRAIN
+tools/viz/make_frames.sh $tmpdir $DELAY $SIZE $STATES $TIME $GRAIN
 
 rm $tmpdir/tmp_*.step
 rm -R $tmpdir
-
-# open rule_gif/temp.gif

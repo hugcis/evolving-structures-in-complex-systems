@@ -19,6 +19,7 @@ TARGETDIRS:=$(foreach dir,$(DIRS),$(addprefix $(BUILDDIR)/, $(dir)))
 TARGET:=$(BINDIR)/automaton
 
 all: directories $(TARGET)
+	$(MAKE) tools/viz/step_to_ppm
 
 $(TARGET): $(OBJS)
 	$(MKDIR) $(BINDIR)
@@ -39,6 +40,9 @@ clean:
 	rmdir $(TARGETDIRS)
 	rmdir $(BINDIR)
 	rmdir $(BUILDDIR)
+
+tools/viz/step_to_ppm:
+	gcc ./tools/viz/step_to_ppm.c -o ./tools/viz/step_to_ppm -lnetpbm
 
 .PHONY: rebuild
 rebuild:

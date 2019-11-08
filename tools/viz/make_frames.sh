@@ -8,7 +8,7 @@ GRAIN=$6
 i=0;
 for fname in `ls $DIR/*.step | sort -V`; do
     printf "Processing frame: $((i+1)) / $((TIME / GRAIN)) \r";
-    ./step_to_ppm $fname $SIZE $STATES \
+    tools/viz/step_to_ppm $fname $SIZE $STATES \
         | pamtogif > "$DIR/tmp_$(printf "%05d" $i).gif" 2>/dev/null \
         && i=$((i+1));
 done;

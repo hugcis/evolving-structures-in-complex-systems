@@ -52,14 +52,24 @@ executable `bin/automaton` with some options for each `.map` file.
 
 After simulating the automata, the metrics are automatically computed. We
 compute:
+
 - The compressed length of the automaton state at step 1000.
 - The lookup table based metric.
 - The neural network based metric.
+
+All metrics are then stored in files for further processing
 
 ### Wrapping all this in a script
 
 All the steps described above are also wrapped in a single script that you can
 run with the command `./scripts/run_all.sh`.
 
-## Python scripts
+## Visualization
+
+Automata evolution can be visualized by generating a GIF image with the script
+`generate_frames.sh` in `tools/viz/`.
+
+## Playing with patterns
+
+The library supports specifying a initial pattern.
 
