@@ -6,3 +6,4 @@ build/
 doc/html/*
 doc/latex/*
 tools/viz/step_to_ppm
+*.pyc
