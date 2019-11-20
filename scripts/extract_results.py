@@ -190,6 +190,20 @@ def shuffle_names(results_dic_dataset):
     return rand_names
 
 
+def get_train_test(rand_names, comp, score, names, inter):
+    """ Use the shuffled name list to create the train and test set with
+    compressed length, score, ID and label.
+    """
+    data = sorted(list(zip(comp, score, names, inter)),
+                  key=lambda x: -x[1])
+
+    train = [i for i in data
+             if i[2] in rand_names[:int(.7*len(data))]]
+    test = [i for i in data
+            if i[2] in rand_names[int(.7*len(data)):]]
+    return train, test
+
+
 def print_accuracies(results_dic_dataset, interest, rand_names):
     # Enumerate timesteps
     for timesteps in [5, 50, 300]:
@@ -208,14 +222,8 @@ def print_accuracies(results_dic_dataset, interest, rand_names):
 
                 inter = get_interest(names, interest)
 
-                data = sorted(list(zip(comp, score, names, inter)),
-                              key=lambda x: -x[1])
-
-                train = [i for i in data
-                         if i[2] in rand_names[:int(.7*len(data))]]
-                test = [i for i in data
-                        if i[2] in rand_names[int(.7*len(data)):]]
-
+                train, test = get_train_test(rand_names, comp, score, names,
+                                             inter)
                 sorted_train = sorted(train, key=lambda x: -x[1])
 
                 thresh = sorted_train[
@@ -225,6 +233,7 @@ def print_accuracies(results_dic_dataset, interest, rand_names):
                 ][1]
 
                 positive_proportion = np.sum([v[3] for v in test])/len(test)
+
                 accuracy = sum([(int(v[3] == 1)
                                  if v[1] >= thresh
                                  else int(v[3] == 0))
@@ -276,6 +285,9 @@ def main():
             content = out_file.read().strip().split('\n')[-1]
             if len(content.split('    ')) >= 5:
                 compressed_length[name] = int(content.split('    ')[-1])
+
+    rand_names = shuffle_names(results_dic_dataset)
+    print_accuracies(results_dic_dataset, interest, rand_names)
 
 if __name__ == "__main__":
     main()
