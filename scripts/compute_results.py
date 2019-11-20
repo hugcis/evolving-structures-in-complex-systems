@@ -36,7 +36,11 @@ def compute_average_precision(data, y_true):
     return avg_prec
 
 def compute_accuracy_with_column(col, train_data, test_data):
+    """ Compute the accuracy of a step classifier that chooses a thresholds
+    minimizing MSE.
+    """
     sorted_train = sorted(train_data.values, key=lambda x: -x[col])
+
     # Find the threshold values that minimizes MSE
     thresh = sorted_train[
         np.argmin([
@@ -53,6 +57,9 @@ def compute_accuracy_with_column(col, train_data, test_data):
 
 
 def compute_accuracy_with_double_threshold(train_data, test_data):
+    """ Compute the accuracy of a classifier that chooses a pair a thresholds
+    minimizing MSE when all examples in between are positive.
+    """
     sorted_train_comp = sorted(train_data.values, key=lambda x: -x[3])
     losses = []
 
@@ -64,9 +71,11 @@ def compute_accuracy_with_double_threshold(train_data, test_data):
             loss += sum([(v[2])**2 for v in sorted_train_comp[j:]])
             losses.append((i, j, loss))
 
+    # Find corresponding thresholds
     idx0, idx1, _ = sorted(losses, key=lambda x: x[2])[0]
     tr0 = sorted_train_comp[idx0][3]
     tr1 = sorted_train_comp[idx1][3]
+
     accuracy = sum([(int(v[2] == 1)
                      if (v[3] <= tr0 and v[3] >= tr1)
                      else int(v[2] == 0))
@@ -96,6 +105,7 @@ def main():
     # Double threshold accuracy
     dbl_thresh_accuracy = compute_accuracy_with_double_threshold(train_data,
                                                                  test_data)
+
 
     print("Proportion of positives: {:.1f}%".format(100*pos_proportion))
     print("Accuracy baseline: {:.1f}%".format(100*baseline_accuracy))
