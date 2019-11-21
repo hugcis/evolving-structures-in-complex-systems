@@ -26,8 +26,8 @@
 
 #define KEY_MAX_LENGTH (256)
 #define PERT 1E-15
-#define WINDOW 501
-#define W_STEP 13
+#define WINDOW 1 /* Total time window to look at */
+#define W_STEP 1 /* Step increment in test window */
 
 
 typedef struct masking_element
@@ -103,8 +103,10 @@ void init_automat(size_t size, uint8_t* a, int states, long init_type)
       }
       else {
         /* Initialize center (border x border) square to random */
-        if ((i >= size/2 - border) && (i < size/2 + border) &&
-            (j >= size/2 - border) && (j < size/2 + border)) {
+        size_t l_border = size/2 - border, u_border = size/2 + border;
+
+        if ((i >= l_border) && (i < u_border) &&
+            (j >= l_border) && (j < u_border)) {
           a[(i % size) * size + (j % size)] = (uint8_t)(rand() % states);
         }
         /* Rest is 0 */
@@ -128,7 +130,6 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
   int bg = 0;
   size_t x = size/2, y = size/2; /* Pattern's upper left corner is the center
                                     of the automaton */
-
   while ((ch = fgetc(pattern_file)) != EOF && pattern_start != -1)  {
     switch (ch) {
     case '#':
@@ -153,7 +154,7 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
           && (ch = fgetc(pattern_file)) != EOF
           && ch == '='
           && (ch = fgetc(pattern_file)) != EOF
-          && isdigit(ch) != 0
+          && isdigit(ch)
           && bg == 0) {
         bg = 1;
         for (size_t i = 0; i < size; ++i) {
@@ -178,12 +179,13 @@ int parse_pattern(size_t size, uint8_t* a, FILE* pattern_file)
   }
 
   /* If BG was not given, initialize all to 0 */
-  for (size_t i = 0; i < size; ++i) {
-    for (size_t j = 0; j < size; ++j) {
-      a[i * size + j] = (uint8_t)0;
+  if (bg == 0) {
+    for (size_t i = 0; i < size; ++i) {
+      for (size_t j = 0; j < size; ++j) {
+        a[i * size + j] = (uint8_t)0;
+      }
     }
   }
-
 
   fclose(pattern_file);
   return pattern_start;
@@ -532,7 +534,7 @@ void compress_double(int step, FILE* out_file,
          out_string, size * size + 1);
 
   int dbl_comp_size =
-    compress_memory_size(dbl_pholder, step * ((size + 1) * size + 1));
+    compress_memory_size(dbl_pholder, 2 * ((size + 1) * size + 1));
   memcpy(dbl_pholder, out_string, (size + 1) * size + 1);
 
   if (step > 0) {
@@ -602,7 +604,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
     init_automat(size, *frame1, states, opts->init_type);
   }
   else if (parse_pattern(size, *frame1, opts->init_pattern_file) <= 0){
-    fprintf(stderr, "Error parsing initialization pattern\n");
+    fprintf(stderr, "Error parsing initialization pattern: %s\n",
+            opts->init_pattern_fname);
     exit(EXIT_FAILURE);
   }
 
@@ -747,18 +750,13 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
 
     int offset_a = 2, offset_b = 1;
 
-    if (i == steps - WINDOW) {
+    if (i == steps - 301) {
       print_bits(size, size, *frame1, out_string300);
       res300 = populate_map(map300, size, *frame1, offset_a, states);
       res300b = populate_map(map300b, size, *frame1, offset_b, states);
 
       memcpy(automat300, *frame1, size * size * sizeof(uint8_t));
     }
-    if (i > (steps - WINDOW) && (i - (steps - WINDOW)) % W_STEP == 0) {
-      memcpy(test_automata[((i - (steps - WINDOW)) / W_STEP) - 1],
-             *frame1, size * size * sizeof(uint8_t));
-    }
-
     if (i == steps - 51) {
       print_bits(size, size, *frame1, out_string50);
       res50 = populate_map(map50, size, *frame1, offset_a, states);
@@ -805,16 +803,30 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       network_result_t res = {1., 1., 1., 0.};
       network_opts_t n_opts = {10, 40, 3, MOMENTUM, DECAY, NO_FISHER, 1};
 
-      for (int i = 4; i < 5; ++i) {
+      for (int i = 1; i < 5; ++i) {
         n_opts.num_hid = 10;
         n_opts.offset = i;
         n_opts.fisher = NO_FISHER;
-
         train_nn_on_automaton(size, states, automat300, test_automata,
                               WINDOW / W_STEP, &n_opts, &res);
-
+        add_nn_results_to_file(nn_file, &n_opts, &res, 300);
+        train_nn_on_automaton(size, states, automat50, test_automata,
+                              WINDOW / W_STEP, &n_opts, &res);
         add_nn_results_to_file(nn_file, &n_opts, &res, 50);
-        fprintf(fisher_file, "%f", res.error_var);
+        train_nn_on_automaton(size, states, automat5, test_automata,
+                              WINDOW / W_STEP, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &n_opts, &res, 5);
+
+        n_opts.num_hid = 20;
+        train_nn_on_automaton(size, states, automat300, test_automata,
+                              WINDOW / W_STEP, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &n_opts, &res, 300);
+        train_nn_on_automaton(size, states, automat300, test_automata,
+                              WINDOW / W_STEP, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &n_opts, &res, 50);
+        train_nn_on_automaton(size, states, automat300, test_automata,
+                              WINDOW / W_STEP, &n_opts, &res);
+        add_nn_results_to_file(nn_file, &n_opts, &res, 5);
 
         results->nn_tr_50 = res.error_var;
         results->nn_te_50 = 1.;

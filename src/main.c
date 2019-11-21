@@ -205,6 +205,7 @@ Options:\n\
       opts.mask = MASK;
       break;
     case 'j':
+      sprintf(opts.init_pattern_fname, "%s", optarg);
       opts.init_pattern_file = fopen(optarg, "r");
       if (opts.init_pattern_file == NULL) {
         fprintf(stderr, "Error opening file %s\n", optarg);

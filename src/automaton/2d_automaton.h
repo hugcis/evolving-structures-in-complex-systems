@@ -19,13 +19,13 @@ enum DataOutput { OUTPUT, NO_OUTPUT };
  *  rule.
  */
 struct Options2D {
-  char data_dir_name[64];
+  char data_dir_name[1024];
   size_t size; /**< The size of the square grid. */
   int grain_write; /**< The grain at which write operations are executed. */
   int grain; /**< The grain at which compression is done. */
   enum WriteStepMode save_flag; /**< Wether to write output to a temporary
                                    file or step file */
-  char out_step_dir[200]; /**< Output dir for the temporary file */
+  char out_step_dir[1024]; /**< Output dir for the temporary file */
   int states;
   int horizon;
   int joint_complexity;
@@ -36,6 +36,7 @@ struct Options2D {
   enum MaskEnum mask;
   enum DataOutput output_data; /**< Wether to compute metrics on the
                                   simulations */
+  char init_pattern_fname[1024];
   FILE* init_pattern_file;
   long init_type; /**< Size of the random initialization zone (-1 for full) */
 };
