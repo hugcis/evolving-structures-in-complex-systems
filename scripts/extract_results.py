@@ -4,6 +4,7 @@ running.
 """
 import os
 import itertools
+import operator
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -83,13 +84,18 @@ def process_nn_file(i, results_dic):
 def extract_labels(results_dic):
     """ Extract IDs and labels from the labels file. """
     results_dic_dataset = {}
-    labels = pd.read_csv(
-        os.path.join(LABELS_DIR, "data_labels.csv"), header=None).values
-
+    labels = pd.read_csv(os.path.join(LABELS_DIR, "data_labels.csv"))
+    labels = labels[["ID", "interesting"]].astype({
+        "ID": str,
+        "interesting": int
+    }).values
     interest = dict(labels)
 
     for key in interest:
-        results_dic_dataset[key] = results_dic[key]
+        if key in results_dic:
+            results_dic_dataset[key] = results_dic[key]
+        else:
+            print("Automaton {} in labels but no file found".format(key))
 
     return results_dic_dataset, interest
 
@@ -231,6 +237,35 @@ def get_train_test_from_dataset(results_dic_dataset, options,
 
     return train, test
 
+def read_lookup_files(results_dic_dataset):
+    """ Parse data from lookup score files. """
+    score_lookup = {
+        'score_2_300': {},
+        'score_2_50': {},
+        'score_2_5': {},
+        'score_1_300': {},
+        'score_1_50': {},
+        'score_1_5': {}
+    }
+    for name in results_dic_dataset:
+        with open(os.path.join(os.path.join(DATA_DIR, "ent/"),
+                               "ent" + name + ".dat")) as ent_file:
+            update_lookup(ent_file, score_lookup, name)
+
+    return score_lookup
+
+
+def read_comp_files(results_dic_dataset):
+    """ Parse data from compressed length score files. """
+    compressed_length = {}
+    for name in results_dic_dataset:
+        with open(os.path.join(os.path.join(DATA_DIR, "out/"),
+                               "out" + name + ".dat")) as out_file:
+            content = out_file.read().strip().split('\n')[-1]
+            if len(content.split('    ')) >= 5:
+                compressed_length[name] = int(content.split('    ')[-1])
+
+    return compressed_length
 
 def print_accuracies(results_dic_dataset, interest, rand_names):
     """ Print accuracies for all available configuraitons """
@@ -238,8 +273,8 @@ def print_accuracies(results_dic_dataset, interest, rand_names):
     for timesteps in [5, 50, 300]:
         # Enumerate sizes of hidden layer
         for hid in [10, 20]:
-            accuracies = []
-            print(timesteps, hid)
+            accuracies = {}
+            print("Time: {}, Hidden layers: {}".format(timesteps, hid))
 
             # Enumerate radii
             for radius in range(1, 6):
@@ -263,11 +298,13 @@ def print_accuracies(results_dic_dataset, interest, rand_names):
                                          else 0
                                          for v in test])/len(test)
                 print((
-                    "{} | Accuracy: {:.3f}, Baseline: {:.2f}"
+                    "\tradius={} | Accuracy: {:.3f}, Baseline: {:.2f}"
                 ).format(radius, accuracy,
                          baseline_accuracy))
 
-                accuracies.append(accuracy)
+                accuracies[Options(radius, timesteps, hid)] = accuracy
+
+    return accuracies
 
 def main():
     """ Create and process items from the data directory. """
@@ -283,30 +320,14 @@ def main():
 
     results_dic_dataset, interest = extract_labels(results_dic)
 
-    score_lookup = {
-        'score_2_300': {},
-        'score_2_50': {},
-        'score_2_5': {},
-        'score_1_300': {},
-        'score_1_50': {},
-        'score_1_5': {}
-    }
-    compressed_length = {}
-
-    for name in results_dic_dataset:
-        with open(os.path.join(os.path.join(DATA_DIR, "ent/"),
-                               "ent" + name + ".dat")) as ent_file:
-            update_lookup(ent_file, score_lookup, name)
-
-        with open(os.path.join(os.path.join(DATA_DIR, "out/"),
-                               "out" + name + ".dat")) as out_file:
-
-            content = out_file.read().strip().split('\n')[-1]
-            if len(content.split('    ')) >= 5:
-                compressed_length[name] = int(content.split('    ')[-1])
+    score_lookup = read_lookup_files(results_dic_dataset)
+    compressed_length = read_comp_files(results_dic_dataset)
 
     rand_names = shuffle_names(results_dic_dataset)
-    print_accuracies(results_dic_dataset, interest, rand_names)
+
+    accuracies = print_accuracies(results_dic_dataset, interest, rand_names)
+    best_options = max(accuracies.items(), key=operator.itemgetter(1))[0]
+    print("Best option was {}".format(best_options))
 
 if __name__ == "__main__":
     main()

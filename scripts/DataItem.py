@@ -35,5 +35,5 @@ class DataItem:
 
     @classmethod
     def make_repr(cls, options: Options, epochs):
-        return "h{} r{} t{}".format(options.n_hid, options.horizon,
+        return "h{} r{} t{}".format(options.n_hid, options.radius,
                                     options.timesteps)
