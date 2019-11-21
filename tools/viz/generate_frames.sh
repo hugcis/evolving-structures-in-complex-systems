@@ -8,6 +8,7 @@ TIME=1000;
 SIZE=256;
 GRAIN=50;
 DELAY=30;
+OUTPUT="";
 Q="";
 PAT="";
 
@@ -28,10 +29,11 @@ Options:\n\
                        grain steps (default: 50).\n\
     -d <delay>         GIF delay parameter (default: 30).\n\
     -n <states>        Number of states of the automaton (default: 3).\n\
+    -o <out_file>      Output GIF file path.\n\
     -j <pattern_file>  Pattern to load for simulation.\n"
 }
 
-while getopts "h?qd:g:s:t:n:j:" opt; do
+while getopts "h?qd:g:s:t:n:j:o:" opt; do
     case "$opt" in
         h|\?)
             show_help
@@ -48,6 +50,8 @@ while getopts "h?qd:g:s:t:n:j:" opt; do
         q)  Q=--masking
             ;;
         n)  STATES=$OPTARG
+            ;;
+        o)  OUTPUT=$OPTARG
             ;;
         j)  PAT="--pattern $OPTARG"
             ;;
@@ -74,7 +78,7 @@ fi
                 $Q --early_stopping --output $tmpdir $PAT ||
     { echo 'Failure during automaton simulation'; exit 1; }
 
-tools/viz/make_frames.sh $tmpdir $DELAY $SIZE $STATES $TIME $GRAIN
+tools/viz/make_frames.sh $tmpdir $DELAY $SIZE $STATES $TIME $GRAIN $OUTPUT
 
 rm $tmpdir/tmp_*.step
 rm -R $tmpdir

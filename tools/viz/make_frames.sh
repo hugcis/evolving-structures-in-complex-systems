@@ -5,6 +5,14 @@ STATES=$4
 TIME=$5
 GRAIN=$6
 
+if [[ -n $7 ]]; then
+    OUTPUT=$7
+else
+    mkdir -p rule_gif/
+    OUTPUT="rule_gif/temp.gif"
+fi
+
+
 i=0;
 for fname in `ls $DIR/*.step | sort -V`; do
     printf "Processing frame: $((i+1)) / $((TIME / GRAIN)) \r";
@@ -15,4 +23,4 @@ done;
 echo '\nDone.'
 
 gifsicle -d $DELAY --loop `ls -v $DIR/tmp*.gif` --scale 3 \
-         > rule_gif/temp.gif
+         > $OUTPUT
