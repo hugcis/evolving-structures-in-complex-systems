@@ -4,6 +4,14 @@ This repository contains the code to reproduce the Figures and numerical results
 from the paper: _Evolving structures in complex systems_ by Hugo Cisneros, Josef
 Sivic and Tomas Mikolov.
 
+## Reproduce results
+
+The results in the paper and values computed to produce those results are in
+`data/`, they were computed with a script that you can run with:
+
+```
+python3 scripts/compute_results.py
+```
 
 ## Build the C library
 
@@ -101,7 +109,7 @@ When simulating a pattern, one can still choose the size of the automaton, the
 number of steps, etc. The patterns will be centered in the middle of the
 automaton for easier visualization.
 
-As an example, the following command that uses the pattern above
+As an example, the following command that uses the spaceship pattern above
 ```bash
 tools/viz/generate_frames.sh -n 4 \
                              -t 300 \
@@ -111,6 +119,6 @@ tools/viz/generate_frames.sh -n 4 \
                              -s 32 \
                              1685000103177278144
 ```
-produces the GIF
+produces the following GIF at `./rule_gif/temp.gif`:
 
 ![Spaceship](figures/ex_spaceship.gif)
