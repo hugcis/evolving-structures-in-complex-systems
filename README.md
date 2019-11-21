@@ -113,4 +113,4 @@ tools/viz/generate_frames.sh -n 4 \
 ```
 produces the GIF
 
-[Spaceship](figures/ex_spaceship.gif)
+![Spaceship](figures/ex_spaceship.gif)
