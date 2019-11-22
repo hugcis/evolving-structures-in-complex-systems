@@ -800,6 +800,8 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       asprintf(&fisher_fname, "data_2d_%i/nn/fisher%s.dat", states, rule_buf);
       fisher_file = fopen(fisher_fname, "w+");
 
+      memcpy(test_automata[0], *frame1, size * size * sizeof(uint8_t));
+
       network_result_t res = {1., 1., 1., 0.};
       network_opts_t n_opts = {10, 40, 3, MOMENTUM, DECAY, NO_FISHER, 1};
 
