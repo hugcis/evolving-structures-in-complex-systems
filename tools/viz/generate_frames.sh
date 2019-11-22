@@ -29,7 +29,7 @@ Options:\n\
                        grain steps (default: 50).\n\
     -d <delay>         GIF delay parameter (default: 30).\n\
     -n <states>        Number of states of the automaton (default: 3).\n\
-    -o <out_file>      Output GIF file path.\n\
+    -o <out_file>      Output GIF file path (default: ./rule_gif/temp.gif).\n\
     -j <pattern_file>  Pattern to load for simulation.\n"
 }
 

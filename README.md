@@ -90,10 +90,18 @@ python3 scripts/extract_results.py
 Automata evolution can be visualized by generating a GIF image with the script
 `generate_frames.sh` in `tools/viz/`.
 
+For more information about the command, execute 
+```
+tools/viz/generate_frames.sh -h
+```
+
 ## Playing with patterns
 
-The library supports specifying a initial pattern for a simulation. Patterns can
-be defined with a specific file format, of which an example is given below.
+The library supports specifying a initial pattern for a simulation. Several
+example patterns are in `example_patterns/`. 
+
+Patterns can be defined with a specific file format, of which an example is
+given below.
 
 ```
 N=4
@@ -118,7 +126,8 @@ When simulating a pattern, one can still choose the size of the automaton, the
 number of steps, etc. The patterns will be centered in the middle of the
 automaton for easier visualization.
 
-As an example, the following command that uses the spaceship pattern above
+As an example, the following command that uses the spaceship pattern above, with
+the four states rule `1685000103177278144`
 ```bash
 tools/viz/generate_frames.sh -n 4 \
                              -t 300 \
@@ -131,3 +140,13 @@ tools/viz/generate_frames.sh -n 4 \
 produces the following GIF at `./rule_gif/temp.gif`:
 
 ![Spaceship](figures/ex_spaceship.gif)
+
+Another example:
+```bash
+tools/viz/generate_frames.sh -n 3 -g 10 -t 2000 -d 10 -s 128 \
+                               -j example_patterns/exploding_3.pat \
+                               16855021099980290151
+```
+It produces
+
+![Explosion](figures/ex_explosion.gif)
