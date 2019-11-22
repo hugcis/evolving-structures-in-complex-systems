@@ -84,18 +84,18 @@ You can run it with
 python3 scripts/extract_results.py
 ```
 
-
-## Visualization
+## Visualization tools
 
 Automata evolution can be visualized by generating a GIF image with the script
-`generate_frames.sh` in `tools/viz/`.
+`generate_frames.sh` in `tools/viz/`. It assigns a set of colors based on the
+number of states
 
 For more information about the command, execute 
 ```
 tools/viz/generate_frames.sh -h
 ```
 
-## Playing with patterns
+## Playing with initialization patterns
 
 The library supports specifying a initial pattern for a simulation. Several
 example patterns are in `example_patterns/`. 
