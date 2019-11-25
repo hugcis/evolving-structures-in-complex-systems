@@ -805,7 +805,7 @@ void process_rule(uint64_t grule_size, uint8_t rule[grule_size],
       network_result_t res = {1., 1., 1., 0.};
       network_opts_t n_opts = {10, 40, 3, MOMENTUM, DECAY, NO_FISHER, 1};
 
-      for (int i = 1; i < 5; ++i) {
+      for (int i = 1; i < 6; ++i) {
         n_opts.num_hid = 10;
         n_opts.offset = i;
         n_opts.fisher = NO_FISHER;
