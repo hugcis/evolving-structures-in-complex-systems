@@ -615,8 +615,8 @@ void train_nn_on_automaton(size_t size, int states,
     test_var = sqrt(test_var);
 
     if (opts->verbosity >= 1) {
-      fprintf(stdout, "\tTest error: %f\tVar: %f\tRatio: %f",
-              error / test_error, test_var, test_error);
+      fprintf(stdout, "\tTest error: %f\tRatio: %f",
+              error / test_error, test_error);
     }
   }
 
