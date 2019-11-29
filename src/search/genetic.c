@@ -48,11 +48,13 @@ void iterative_search(int n_simulations, int input_flag,
   int n_children = 10;
   results_nn_t res = {0, 0, 0, 0, 0, 0};
 
+  /* Current populaiton of rules */
   uint8_t** population = (uint8_t**) malloc(sizeof(uint8_t *)
                                             * population_size);
+  /* Temporary second array for population */
   uint8_t** tmp_pop = (uint8_t**) malloc(sizeof(uint8_t *)
                                          * population_size);
-
+  /* Children array */
   uint8_t** children = (uint8_t**) malloc(sizeof(uint8_t *)
                                           * population_size
                                           * n_children);
