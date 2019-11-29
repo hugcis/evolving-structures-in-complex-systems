@@ -10,7 +10,7 @@
 
 #define CHANNELS 3
 
-const int palette_rgb[18][CHANNELS] = {
+const int palette_rgb[23][CHANNELS] = {
                                 {255, 255, 255},
                                 {0, 0, 0},
                                 {255, 0, 0},     /* Red */
@@ -20,6 +20,11 @@ const int palette_rgb[18][CHANNELS] = {
                                 {255, 69, 0},    /* Red-Orange */
                                 {255, 255, 0},   /* Yellow */
                                 {13, 152, 186},  /* Blue-green */
+                                {255, 0, 0},
+                                {204, 255, 0},
+                                {0, 255, 101},
+                                {0, 101, 255},
+                                {203, 0, 255},
                                 {255, 100, 51},
                                 {42, 75, 215},
                                 {29, 105, 20},
@@ -64,8 +69,10 @@ int main(int argc, const char** argv)
     color_offset = 0;
   } else if (states == 3) {
     color_offset = 2;
-  } else {
+  } else if (states == 4) {
     color_offset = 5;
+  } else {
+    color_offset = 9;
   }
 
   for (row = 0; row < outpam.height; ++row) {
