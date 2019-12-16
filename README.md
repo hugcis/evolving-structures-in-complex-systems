@@ -4,6 +4,8 @@ This repository contains the code to reproduce the Figures and numerical results
 from the paper: _Evolving structures in complex systems_ by Hugo Cisneros, Josef
 Sivic and Tomas Mikolov.
 
+[Project Slides](https://docs.google.com/presentation/d/1KmJvyKHKAeZvPPUGPVRdSEgyD8vUOoKhJtLZUCVxf7A/edit?usp=sharing)
+
 ## Build the C library
 
 The provided C library implements a general cellular automaton simulator and all
